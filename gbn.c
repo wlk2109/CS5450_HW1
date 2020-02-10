@@ -49,9 +49,14 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen){
 
 int gbn_listen(int sockfd, int backlog){
 
-	/* TODO: Your code here. */
+	/* No "Listening" in UDP sockets */
+	
+	printf("'Listening'. sockfd: %d, backlog: %d \n", sockfd, backlog);
 
-	return(-1);
+	/* Set the status to closed, since there is no connection active if we are listening*/
+	s.current_state = CLOSED;
+
+	return(0);
 }
 
 int gbn_bind(int sockfd, const struct sockaddr *server, socklen_t socklen){
@@ -95,7 +100,9 @@ int gbn_socket(int domain, int type, int protocol){
 	/* Set initial window size to 1 (2^0)*/
     s.window_size = 1;
 
-    /* Make a signal handler*/
+    /* Make a signal handler
+	 TODOL Figure this out.
+	*/
     signal(SIGALRM, timeout_hdler);
 
     printf("Seq num: %d, Window size: %d\n", s.seq_num, s.window_size);
@@ -109,7 +116,34 @@ int gbn_socket(int domain, int type, int protocol){
 
 int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 
+	/* Called by receiver */
+
 	/* TODO: Your code here. */
+	printf("gbn_accept() called. socket: %d, client address: %d\n", sockfd, client->sa_family);
+
+    printf("Current state: %d\n", s.curr_state);
+
+	/* 1. Wait for a SYN Packet to arrive
+	   2. Send a SYN_ACK Packet back. 
+	   3. Upon Successful complete of these steps, update state machine to be connected. 
+	   ?. Handle rejection 
+	   ?. Handle Timeout
+	   ?. Handle Max Attempts */
+
+	/* Allocate memory for a SYN packet to be received*/
+
+	/* Create a SYN_ACK Packet to be sent */
+
+	/* Wait for the SYN Packet */ 
+
+	/* Validate */
+
+	/* Send SYN_ACK*/
+
+	/* Confirm send */
+
+	/* update state */
+
 
 	return(-1);
 }
@@ -180,7 +214,7 @@ ssize_t maybe_sendto(int  s, const void *buf, size_t len, int flags, \
 void timeout_hdler(int signum) {
 	/* TODO: FIX THIS */
 
-	
+
     /* apparently bad practice to printf in signal use flag instead */
     printf("\nTIMEOUT has occured with signum: %d\n", signum);
 

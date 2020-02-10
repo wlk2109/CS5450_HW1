@@ -46,6 +46,7 @@ typedef struct {
 typedef struct state_t{
 	
 	/* TODO: Your state information could be encoded here. */
+
 	int current_state;			/* CLOSED, SYN_SENT, SYN_RCVD etc...*/
 	uint32_t seq_num;			/* Current Sequence Number */
 	uint8_t window_size;		/* Current window size. Starts at 1, dynamically increases/decreases by factor of 2*/
@@ -65,6 +66,12 @@ enum {
 
 extern state_t s;
 
+void timeout_hdler(int);
+void build_data_packet(gbnhdr *data_packet, uint32_t pkt_seqnum, \
+            const void *buff_ptr, size_t data_len, int data_type);
+uint8_t validate(gbnhdr *packet);
+
+
 void gbn_init();
 int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen);
 int gbn_listen(int sockfd, int backlog);
@@ -79,6 +86,7 @@ ssize_t  maybe_recvfrom(int  s, char *buf, size_t len, int flags, \
             struct sockaddr *from, socklen_t *fromlen);
 
 uint16_t checksum(uint16_t *buf, int nwords);
+
 
 
 #endif
