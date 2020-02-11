@@ -41,6 +41,7 @@ typedef struct {
 	uint8_t  seqnum;          /* sequence number of the packet              */
     uint16_t checksum;        /* header and payload checksum                */
     uint8_t data[DATALEN];    /* pointer to the payload                     */
+	uint16_t payload_len;	  /* Length of relevant data in packet          */
 } __attribute__((packed)) gbnhdr;
 
 typedef struct state_t{
@@ -67,7 +68,7 @@ enum {
 extern state_t s;
 
 void timeout_hdler(int);
-void build_data_packet(gbnhdr *data_packet, uint32_t pkt_seqnum, const void *buff_ptr, size_t data_len, int data_type);
+void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr, size_t data_len);
 uint8_t validate(gbnhdr *packet);
 gbnhdr *alloc_recv_pkt();
 

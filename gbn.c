@@ -134,7 +134,7 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 	gbnhdr *incoming_pkt = alloc_recv_pkt();
 
 	/* Create a SYN_ACK Packet to be sent */
-	
+
 
 	/* Wait for the SYN Packet */ 
 
@@ -229,8 +229,17 @@ uint8_t validate(gbnhdr *packet){
 	return(-1);
 };
 
-void build_data_packet(gbnhdr *data_packet, uint32_t pkt_seqnum, const void *buff_ptr, size_t data_len, int data_type){
-	/* TODO: Implement */
+void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr, size_t data_len){
+	/* Construct a packet */
+
+	/* Memory Already Allocated */
+	/* Set Packet type  */
+	/* Set Packet Seqnum */
+	/* Zero out data */
+	/* Set Payload_len */ 
+	/* Copy Data from buff*/
+	/**/
+
 	return(-1);
 }
 
