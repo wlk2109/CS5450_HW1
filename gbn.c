@@ -232,10 +232,13 @@ uint8_t validate(gbnhdr *packet){
 void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr, size_t data_len){
 	/* Construct a packet */
 
+	printf("Building packet. Paylod Length: %d\n", (int)data_len);
+
 	/* Memory Already Allocated */
 	/* Set Packet type  */
 	/* Set Packet Seqnum */
-	/* Zero out data */
+	/* Zero out data  and checksum */
+	
 	/* Set Payload_len */ 
 	/* Copy Data from buff*/
 	/**/
