@@ -211,6 +211,26 @@ ssize_t maybe_sendto(int  s, const void *buf, size_t len, int flags, \
         return(len);  /* Simulate a success */
 }
 
+gbnhdr *alloc_recv_pkt(){
+	
+	// Allocated memory for an incoming packet
+	gbnhdr *incoming_packet = malloc(size_of(*incoming_packet));
+	// Set data to 0's
+	memset(incoming_packet, 0, size_of(*incoming_packet));
+
+	return(incoming_packet;)
+}
+
+uint8_t validate(gbnhdr *packet){
+	/*TODO: Implement*/
+	return(-1);
+};
+
+void build_data_packet(gbnhdr *data_packet, uint32_t pkt_seqnum, const void *buff_ptr, size_t data_len, int data_type){
+	/* TODO: Implement */
+	return(-1);
+}
+
 void timeout_hdler(int signum) {
 	/* TODO: FIX THIS */
 

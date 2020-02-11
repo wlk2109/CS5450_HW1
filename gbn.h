@@ -67,9 +67,9 @@ enum {
 extern state_t s;
 
 void timeout_hdler(int);
-void build_data_packet(gbnhdr *data_packet, uint32_t pkt_seqnum, \
-            const void *buff_ptr, size_t data_len, int data_type);
+void build_data_packet(gbnhdr *data_packet, uint32_t pkt_seqnum, const void *buff_ptr, size_t data_len, int data_type);
 uint8_t validate(gbnhdr *packet);
+gbnhdr *alloc_recv_pkt();
 
 
 void gbn_init();
