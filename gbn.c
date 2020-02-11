@@ -255,6 +255,7 @@ void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, co
 	/* Copy Data from buff*/
 	/**/
 
+	memset(data_packet->data, 0, sizeof(data_packet->data));
 	data_packet->type = pkt_type;
 	data_packet->seqnum = pkt_seqnum;
 	data_packet->payload_len = data_len;
