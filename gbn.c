@@ -255,11 +255,11 @@ void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, co
 	/* Copy Data from buff*/
 	/**/
 
-	data_packet->type = data_type;
+	data_packet->type = pkt_type;
 	data_packet->seqnum = pkt_seqnum;
 	data_packet->payload_len = data_len;
 	
-	memcpy(data_packet->data, buff_ptr, data_len);
+	memcpy(data_packet->data, buffr, data_len);
 	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
 }
 
