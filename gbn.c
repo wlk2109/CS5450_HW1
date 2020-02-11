@@ -121,7 +121,7 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 	/* TODO: Your code here. */
 	printf("gbn_accept() called. socket: %d, client address: %d\n", sockfd, client->sa_family);
 
-    printf("Current state: %d\n", s.curr_state);
+    printf("Current state: %d\n", s.current_state);
 
 	/* 1. Wait for a SYN Packet to arrive
 	   2. Send a SYN_ACK Packet back. 
@@ -131,8 +131,10 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 	   ?. Handle Max Attempts */
 
 	/* Allocate memory for a SYN packet to be received*/
+	gbnhdr *incoming_pkt = alloc_recv_pkt();
 
 	/* Create a SYN_ACK Packet to be sent */
+	
 
 	/* Wait for the SYN Packet */ 
 
@@ -144,6 +146,7 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 
 	/* update state */
 
+	free(incoming_pkt);
 
 	return(-1);
 }
@@ -212,13 +215,13 @@ ssize_t maybe_sendto(int  s, const void *buf, size_t len, int flags, \
 }
 
 gbnhdr *alloc_recv_pkt(){
-	
+
 	// Allocated memory for an incoming packet
 	gbnhdr *incoming_packet = malloc(size_of(*incoming_packet));
 	// Set data to 0's
 	memset(incoming_packet, 0, size_of(*incoming_packet));
 
-	return(incoming_packet;)
+	return(incoming_packet);
 }
 
 uint8_t validate(gbnhdr *packet){
