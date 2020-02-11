@@ -42,7 +42,18 @@ int gbn_close(int sockfd){
 
 int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen){
 
-	/* TODO: Your code here. */
+	/* 1. Create SYN Packet
+	   2. Send SYN Packet to reciever and move to SYN_SENT
+	   3. Wait for SYNACK and update state machine to ESTABLISHED
+	   ?. Handle rejection 
+	   ?. Handle Timeout
+	   ?. Handle Max Attempts */
+
+	printf("gbn_connect() called. socket: %d, server address: %d socklen: %d\n", sockfd, server->sa_family, socklen);
+    printf("Current state: %d\n", s.current_state);
+
+	/* Create the SYN Packet */
+
 
 	return(-1);
 }
@@ -131,10 +142,10 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 	   ?. Handle Max Attempts */
 
 	/* Allocate memory for a SYN packet to be received*/
-	gbnhdr *incoming_pkt = alloc_recv_pkt();
+	gbnhdr *incoming_pkt = alloc_pkt();
 
 	/* Create a SYN_ACK Packet to be sent */
-
+	
 
 	/* Wait for the SYN Packet */ 
 
@@ -214,14 +225,14 @@ ssize_t maybe_sendto(int  s, const void *buf, size_t len, int flags, \
         return(len);  /* Simulate a success */
 }
 
-gbnhdr *alloc_recv_pkt(){
+gbnhdr *alloc_pkt(){
 
 	// Allocated memory for an incoming packet
-	gbnhdr *incoming_packet = malloc(size_of(*incoming_packet));
+	gbnhdr *packet = malloc(size_of(*packet));
 	// Set data to 0's
-	memset(incoming_packet, 0, size_of(*incoming_packet));
+	memset(packet, 0, size_of(*packet));
 
-	return(incoming_packet);
+	return(packet);
 }
 
 uint8_t validate(gbnhdr *packet){
@@ -230,6 +241,7 @@ uint8_t validate(gbnhdr *packet){
 };
 
 void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr, size_t data_len){
+
 	/* Construct a packet */
 
 	printf("Building packet. Paylod Length: %d\n", (int)data_len);
@@ -243,7 +255,12 @@ void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, co
 	/* Copy Data from buff*/
 	/**/
 
-	return(-1);
+	data_packet->type = data_type;
+	data_packet->seqnum = pkt_seqnum;
+	data_packet->payload_len = data_len;
+	
+	memcpy(data_packet->data, buff_ptr, data_len);
+	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
 }
 
 void timeout_hdler(int signum) {
