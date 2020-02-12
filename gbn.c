@@ -254,20 +254,23 @@ void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, co
 	printf("Building packet. Paylod Length: %d\n", (int)data_len);
 
 	/* Memory Already Allocated */
-	/* Set Packet type  */
-	/* Set Packet Seqnum */
-	/* Zero out data  and checksum */
-	
-	/* Set Payload_len */ 
-	/* Copy Data from buff*/
-	/**/
 
+	/* Zero out data  and checksum */
 	memset(data_packet->data, 0, sizeof(data_packet->data));
+	memset(data_packet->checksum, 0, sizeof(data_packet->checksum));
+
+	/* Set Packet type  */
 	data_packet->type = pkt_type;
+
+	/* Set Packet Seqnum */
 	data_packet->seqnum = pkt_seqnum;
-	data_packet->payload_len = data_len;
 	
+	/* Set Payload_len */
+	data_packet->payload_len = data_len;
+	/* Copy Data from buff*/
 	memcpy(data_packet->data, buffr, data_len);
+
+	/* Add Checksum*/
 	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
 }
 
