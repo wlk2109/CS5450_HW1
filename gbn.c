@@ -55,16 +55,12 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen){
 	/* Create SYN Packet */
 	gbnhdr *SYN_packet = alloc_pkt();
 
-	gbnhdr *buffer = malloc(size_of(*buffer));
-	memset(buffer, 0, size_of(*buffer));
+	gbnhdr *buffer = malloc(sizeof(*buffer));
+	memset(buffer, 0, sizeof(*buffer));
 
 	build_packet(SYN_packet, SYN , s.seq_num, buffer, 0);
 
 	
-
-
-	/* Create the SYN Packet */
-
 
 	return(-1);
 }
@@ -91,7 +87,7 @@ int gbn_bind(int sockfd, const struct sockaddr *server, socklen_t socklen){
 	WHERE DOES THIS GO?
 	int yes=1;
 
-	// lose the pesky "Address already in use" error message
+	lose the pesky "Address already in use" error message
 	if (setsockopt(listener,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof yes) == -1) {
  		perror("setsockopt");
     	exit(1);
@@ -238,10 +234,10 @@ ssize_t maybe_sendto(int  s, const void *buf, size_t len, int flags, \
 
 gbnhdr *alloc_pkt(){
 
-	// Allocated memory for an incoming packet
-	gbnhdr *packet = malloc(size_of(*packet));
-	// Set data to 0's
-	memset(packet, 0, size_of(*packet));
+	/* Allocated memory for an incoming packet */
+	gbnhdr *packet = malloc(sizeof(*packet));
+	/* Set data to 0's */
+	memset(packet, 0, sizeof(*packet));
 
 	return(packet);
 }
