@@ -214,23 +214,50 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 
 	/* Allocate memory for a SYN packet to be received*/
 	gbnhdr *incoming_pkt = alloc_pkt();
-	gbnhdr *syn_ack_pkt = allocpkt();
 
-	/* Create a SYN_ACK Packet to be sent */
-	build_empty_packet(syn_ack_pkt, SYNACK, s.seq_num);
+	int attempts = 0;
+	ssize_t recvd_bytes;
 
-	/* Wait for the SYN Packet */ 
+
+	while(TRUE){
+
+	/* Check Attempts Number*/
+	if (attempts > MAX_ATTEMPTS){
+		printf("\nMax Attempts exceeded. Connection Broken. Exiting\n");
+		s.current_state = CLOSED;
+
+		free(incoming_pkt);
+		return(-1);
+	}
+
+	/* Wait for the SYN Packet, if socket is currently closed. */ 
+	if (s.current_state == CLOSED){
+
+		/*TODO: Confirm this is proper Alarm spot*/
+		alarm(TIMEOUT);
+		attempts++;
+		printf("Waiting for SYNthia...\n Attempt #: %d\n", attempts);
+
+		if ((recvd_bytes = maybe_recvfrom(sockfd, incoming_pkt, sizeof(incoming_pkt), 0, client, socklen)) == -1){
+			
+
+		}
+	}
 
 	/* Validate */
 
+	/* Create a SYN_ACK Packet to be sent */
+
 	/* Send SYN_ACK*/
+
 
 	/* Confirm send */
 
 	/* update state */
 
 	free(incoming_pkt);
-	free (syn_ack_pkt);
+	//free(syn_ack_pkt);
+	}
 
 	return(-1);
 }
