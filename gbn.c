@@ -52,6 +52,17 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen){
 	printf("gbn_connect() called. socket: %d, server address: %d socklen: %d\n", sockfd, server->sa_family, socklen);
     printf("Current state: %d\n", s.current_state);
 
+	/* Create SYN Packet */
+	gbnhdr *SYN_packet = alloc_pkt();
+
+	gbnhdr *buffer = malloc(size_of(*buffer));
+	memset(buffer, 0, size_of(*buffer));
+
+	build_packet(SYN_packet, SYN , s.seq_num, buffer, 0);
+
+	
+
+
 	/* Create the SYN Packet */
 
 

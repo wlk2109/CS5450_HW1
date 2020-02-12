@@ -25,6 +25,7 @@ extern int errno;
 #define DATALEN   1024    /* length of the payload                       */
 #define N         1024    /* Max number of packets a single call to gbn_send can process */
 #define TIMEOUT      1    /* timeout to resend packets (1 second)        */
+#define MAX_ATTEMPTS 5	  /* max attempts before assuming broken connection */
 
 /*----- Packet types -----*/
 #define SYN      0        /* Opens a connection                          */
