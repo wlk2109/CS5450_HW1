@@ -182,10 +182,8 @@ int gbn_socket(int domain, int type, int protocol){
 	/* Set initial window size to 1 (2^0)*/
     s.window_size = 1;
 
-    /* Make a signal handler
-	 TODOL Figure this out.
-	*/
-    signal(SIGALRM, timeout_hdler);
+    /* initialize signal handler	*/
+	signal(SIGALRM, timeout_hdler);
 
     printf("Seq num: %d, Window size: %d\n", s.seq_num, s.window_size);
 
@@ -218,31 +216,33 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 	int attempts = 0;
 	ssize_t recvd_bytes;
 
-
-	while(TRUE){
-
 	/* Check Attempts Number*/
-	if (attempts > MAX_ATTEMPTS){
-		printf("\nMax Attempts exceeded. Connection Broken. Exiting\n");
-		s.current_state = CLOSED;
+	while(attempts > MAX_ATTEMPTS){
 
-		free(incoming_pkt);
-		return(-1);
-	}
+		
+		/* Wait for the SYN Packet, if socket is currently closed. */ 
+		if (s.current_state == CLOSED){
 
-	/* Wait for the SYN Packet, if socket is currently closed. */ 
-	if (s.current_state == CLOSED){
+			/*TODO: Confirm this is proper Alarm spot*/
+			alarm(TIMEOUT);
+			attempts++;
+			printf("Waiting for SYNthia...\n Attempt #: %d\n", attempts);
 
-		/*TODO: Confirm this is proper Alarm spot*/
-		alarm(TIMEOUT);
-		attempts++;
-		printf("Waiting for SYNthia...\n Attempt #: %d\n", attempts);
-
-		if ((recvd_bytes = maybe_recvfrom(sockfd, incoming_pkt, sizeof(incoming_pkt), 0, client, socklen)) == -1){
-			
+			if ((recvd_bytes = maybe_recvfrom(sockfd, incoming_pkt, sizeof(incoming_pkt), 0, client, socklen)) == -1){
+				/* Maybe_recvfrom failed, TIMEOUT did not occur */
+				if (errno != EINTR) {
+					perror("Recv From Failed\n");
+					s.current_state = CLOSED;
+					/* Attempt again */
+					continue;
+				}
+			}
+			/* Received data successfully */
 
 		}
-	}
+		else{
+			/* Connection isn't closed */
+		}
 
 	/* Validate */
 
@@ -258,8 +258,12 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 	free(incoming_pkt);
 	//free(syn_ack_pkt);
 	}
+	printf("\nMax Attempts exceeded. Connection Broken. Exiting\n");
+	s.current_state = CLOSED;
 
+	free(incoming_pkt);
 	return(-1);
+
 }
 
 ssize_t maybe_recvfrom(int  s, char *buf, size_t len, int flags, struct sockaddr *from, socklen_t *fromlen){
@@ -340,11 +344,11 @@ uint8_t validate(gbnhdr *packet){
 	return(-1);
 };
 
-void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr, size_t data_len){
+void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr){
 
 	/* Construct a packet */
 
-	printf("Building packet. Paylod Length: %d\n", (int)data_len);
+	printf("Building packet. Paylod Length: %d\n", sizeof(*buffr));
 
 	/* Memory Already Allocated */
 
@@ -357,11 +361,9 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 
 	/* Set Packet Seqnum */
 	data_packet->seqnum = pkt_seqnum;
-	
-	/* Set Payload_len */
-	data_packet->payload_len = data_len;
+
 	/* Copy Data from buff*/
-	memcpy(data_packet->data, buffr, data_len);
+	memcpy(data_packet->data, buffr, sizeof(*buffr));
 
 	/* Add Checksum*/
 	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
@@ -373,7 +375,7 @@ void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqn
 
 
 	/* Construct a packet */
-	printf("Building Empty Packet\n");
+	printf("Building empty packet. Packet Type: %s\n", pkt_type);
 
 	/* Zero out checksum */
 	memset(data_packet->checksum, 0, sizeof(data_packet->checksum));
@@ -389,10 +391,7 @@ void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqn
 }
 
 void timeout_hdler(int signum) {
-	/* TODO: FIX THIS */
 
-
-    /* apparently bad practice to printf in signal use flag instead */
     printf("\nTIMEOUT has occured with signum: %d\n", signum);
 
     /* TODO is this safe? race condition? */
