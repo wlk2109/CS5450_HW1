@@ -40,7 +40,7 @@ int gbn_close(int sockfd){
 	return(-1);
 }
 
-int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen){
+int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen) {
 
 	/* 1. Create SYN Packet
 	   2. Send SYN Packet to reciever and move to SYN_SENT
@@ -54,7 +54,7 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen){
 
 	/* Create SYN Packet */
 	gbnhdr *SYN_pkt = alloc_pkt();
-	build_empty_packet(SYN_pkt, SYN , s.seq_num, 0);
+	build_empty_packet(SYN_pkt, SYN , s.seq_num);
 
 	/* Create SYNACK Packet */
 	gbnhdr *SYNACK_pkt = alloc_pkt();
@@ -62,11 +62,69 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen){
 	/* Begin trying to establish connection */
 	int counter = 0;
 
-	while(TRUE) {
+	/* Try 5 attempts max */
+	while(counter > MAX_ATTEMPTS) {
+
+		if (s.current_state == CLOSED) {
+
+			/*Try sending packet to establish connection */
+			printf("Sending SYN packet. Seqnum: %d\n", SYN_pkt->seqnum);
+
+			if (maybe_sendto(sockfd, SYN_pkt, sizeof(SYN_pkt), 0, server, socklen) == -1) {
+				perror("Sending SYN Packet returned an error\n");
+				return(-1);
+			}
+
+			/* Change state to sent */
+			s.current_state = SYN_SENT;
+			
+			printf("Changed current state to SYN_SENT now waiting for SYN_ACK\n");
+		}
+		
+		if (s.current_state == SYN_SENT) {
+			
+			counter++;
+			alarm(TIMEOUT);
+
+			if (maybe_recvfrom(sockfd, SYNACK_pkt, sizeof(SYNACK_pkt), 0, server, socklen) == -1) {
+				
+				if (errno == EINTR) {
+					perror("TIMEOUT error in waiting for SYNACK packet\n");
+				} else {
+					perror("Error in recieving SYNACK packet\n");
+				}
+				
+				s.current_state = CLOSED;
+				continue;
+			}
+		}
+
+		if ((SYNACK_pkt->type == SYNACK) && (validate(SYNACK_pkt) == 1)) {
+
+			alarm(0);
+			printf("Recieved SYNACK packet successfully\n");
+
+			s.address =  *(struct sockaddr *) &server;
+			s.sock_len = socklen;
+			s.current_state = ESTABLISHED;
+			s.seq_num = SYN_pkt->seqnum;
+			s.current_state = ESTABLISHED;
+
+			printf("Connection Established with server\n");
+			free(SYN_pkt);
+			free(SYNACK_pkt);
+
+			return sockfd;
+		}
 
 	}
-
 	
+	if (counter > MAX_ATTEMPTS) {
+		printf("Reached maximum attempts");
+		free(SYN_pkt);
+		free(SYNACK_pkt);
+		return(-1);
+	}
 
 	return(-1);
 }
@@ -283,7 +341,7 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum){
 
 	/* Construct a packet */
-	printf("Building packet. Paylod Length: %d\n", (int)data_len);
+	printf("Building Empty Packet\n");
 
 	/* Zero out checksum */
 	memset(data_packet->checksum, 0, sizeof(data_packet->checksum));

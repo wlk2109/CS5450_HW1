@@ -92,6 +92,9 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags);
 ssize_t  maybe_recvfrom(int  s, char *buf, size_t len, int flags, \
             struct sockaddr *from, socklen_t *fromlen);
 
+ssize_t maybe_sendto(int  s, const void *buf, size_t len, int flags, \
+                     const struct sockaddr *to, socklen_t tolen);
+
 uint16_t checksum(uint16_t *buf, int nwords);
 
 
