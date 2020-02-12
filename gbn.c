@@ -53,9 +53,18 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen){
     printf("Current state: %d\n", s.current_state);
 
 	/* Create SYN Packet */
-	gbnhdr *SYN_packet = alloc_pkt();
+	gbnhdr *SYN_pkt = alloc_pkt();
+	build_empty_packet(SYN_pkt, SYN , s.seq_num, 0);
 
-	build_empty_packet(SYN_packet, SYN , s.seq_num, 0);
+	/* Create SYNACK Packet */
+	gbnhdr *SYNACK_pkt = alloc_pkt();
+
+	/* Begin trying to establish connection */
+	int counter = 0;
+
+	while(TRUE) {
+
+	}
 
 	
 
@@ -271,7 +280,7 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
 }
 
-void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, size_t data_len){
+void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum){
 
 	/* Construct a packet */
 	printf("Building packet. Paylod Length: %d\n", (int)data_len);
@@ -284,9 +293,6 @@ void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqn
 
 	/* Set Packet Seqnum */
 	data_packet->seqnum = pkt_seqnum;
-	
-	/* Set Payload_len */
-	data_packet->payload_len = data_len;
 
 	/* Add Checksum*/
 	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
