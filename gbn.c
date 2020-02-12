@@ -55,10 +55,7 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen){
 	/* Create SYN Packet */
 	gbnhdr *SYN_packet = alloc_pkt();
 
-	gbnhdr *buffer = malloc(sizeof(*buffer));
-	memset(buffer, 0, sizeof(*buffer));
-
-	build_packet(SYN_packet, SYN , s.seq_num, buffer, 0);
+	build_empty_packet(SYN_packet, SYN , s.seq_num, 0);
 
 	
 
@@ -247,7 +244,7 @@ uint8_t validate(gbnhdr *packet){
 	return(-1);
 };
 
-void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr, size_t data_len){
+void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr, size_t data_len){
 
 	/* Construct a packet */
 
@@ -269,6 +266,27 @@ void build_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, co
 	data_packet->payload_len = data_len;
 	/* Copy Data from buff*/
 	memcpy(data_packet->data, buffr, data_len);
+
+	/* Add Checksum*/
+	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
+}
+
+void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, size_t data_len){
+
+	/* Construct a packet */
+	printf("Building packet. Paylod Length: %d\n", (int)data_len);
+
+	/* Zero out checksum */
+	memset(data_packet->checksum, 0, sizeof(data_packet->checksum));
+
+	/* Set Packet type  */
+	data_packet->type = pkt_type;
+
+	/* Set Packet Seqnum */
+	data_packet->seqnum = pkt_seqnum;
+	
+	/* Set Payload_len */
+	data_packet->payload_len = data_len;
 
 	/* Add Checksum*/
 	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
