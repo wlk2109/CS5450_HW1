@@ -214,9 +214,10 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 
 	/* Allocate memory for a SYN packet to be received*/
 	gbnhdr *incoming_pkt = alloc_pkt();
+	gbnhdr *syn_ack_pkt = allocpkt();
 
 	/* Create a SYN_ACK Packet to be sent */
-	
+	build_empty_packet(syn_ack_pkt, SYNACK, s.seq_num);
 
 	/* Wait for the SYN Packet */ 
 
@@ -229,6 +230,7 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 	/* update state */
 
 	free(incoming_pkt);
+	free (syn_ack_pkt);
 
 	return(-1);
 }
@@ -339,6 +341,9 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 }
 
 void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum){
+
+	/*TODO: COnfirm Word Size for Checksum calculation*/
+
 
 	/* Construct a packet */
 	printf("Building Empty Packet\n");
