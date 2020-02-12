@@ -86,7 +86,7 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen) {
 			counter++;
 			alarm(TIMEOUT);
 
-			if (maybe_recvfrom(sockfd, SYNACK_pkt, sizeof(SYNACK_pkt), 0, server, socklen) == -1) {
+			if (maybe_recvfrom(sockfd, SYNACK_pkt, sizeof(SYNACK_pkt), 0, server, &socklen) == -1) {
 				
 				if (errno == EINTR) {
 					perror("TIMEOUT error in waiting for SYNACK packet\n");
@@ -217,7 +217,7 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 	ssize_t recvd_bytes;
 
 	/* Check Attempts Number*/
-	while(attempts > MAX_ATTEMPTS){
+	while(attempts < MAX_ATTEMPTS){
 
 		
 		/* Wait for the SYN Packet, if socket is currently closed. */ 
@@ -238,25 +238,70 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 				}
 			}
 			/* Received data successfully */
+			/* Turn off alarm*/
+			alarm(0);
 
+			printf("\nPacket received! Bytes: %d, Packet Type: %d\n", (int)recvd_bytes, incoming_pkt->type);
+			
 		}
 		else{
 			/* Connection isn't closed */
+			/* REJECT */
+			printf("Rejecting connection. Socket already in use\n");
+			return(-1);
+
+			/* Backlog? */
 		}
 
-	/* Validate */
+		/* Validate */
+		if ((incoming_pkt->type == SYN) && (validate(incoming_pkt))){
+			
+			printf("SYN City\n");
 
-	/* Create a SYN_ACK Packet to be sent */
+			s.current_state = SYN_RCVD;
+			s.seq_num = incoming_pkt -> seqnum;
 
-	/* Send SYN_ACK*/
+			
+			/* Create a SYN_ACK Packet to be sent */
+			printf("Making SYN_ACK packet\n");
+			gbnhdr* SYNACK_packet = alloc_pkt();
+			build_empty_packet(SYNACK_packet, SYNACK, s.seq_num);
 
+			/* Send SYN_ACK*/
+			attempts = 0;
+			while(attempts < MAX_ATTEMPTS){
 
-	/* Confirm send */
+				if (maybe_sendto(sockfd, SYNACK_packet, sizeof(SYNACK_packet), 0, client, *socklen) == -1){
+				/* Maybe_sendto failed, TIMEOUT did not occur */
+					perror("sendto Failed.\n");
+					/* Attempt again */
+					attempts++;
+					if (attempts == MAX_ATTEMPTS){
+						/* Too Many Attempts*/
+						printf("Sendto max attempts exceeded. Connection closed. \n");
+						s.current_state = CLOSED;
+						s.seq_num = 0;
 
-	/* update state */
+						free(incoming_pkt);
+						free(SYNACK_packet);
+						return(-1);
+					}
+					continue;
+				}
+				break;
+			}
 
-	free(incoming_pkt);
-	//free(syn_ack_pkt);
+            s.current_state = ESTABLISHED;
+            s.address = *client;
+            s.sock_len = *socklen;
+
+            printf("Current state ESTABLISHED: %d\n", s.current_state);
+
+            free(incoming_pkt);
+            free(SYNACK_packet);
+            return sockfd;
+		}
+
 	}
 	printf("\nMax Attempts exceeded. Connection Broken. Exiting\n");
 	s.current_state = CLOSED;
@@ -341,6 +386,17 @@ gbnhdr *alloc_pkt(){
 
 uint8_t validate(gbnhdr *packet){
 	/*TODO: Implement*/
+	uint16_t rcvd_checksum = packet->checksum;
+	packet->checksum = (uint16_t)0;
+
+	uint16_t pkt_checksum = checksum((uint16_t  *)packet, sizeof(*packet) / sizeof(uint16_t));
+	printf("rcvd_checksum: %d pkt_checksum: %d\n", rcvd_checksum, pkt_checksum);
+	
+	if (rcvd_checksum == pkt_checksum){
+		return(1);
+	}
+	
+	printf("Invalid Checksum.");
 	return(-1);
 };
 
@@ -348,13 +404,13 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 
 	/* Construct a packet */
 
-	printf("Building packet. Paylod Length: %d\n", sizeof(*buffr));
+	printf("Building packet. Paylod Length: %d\n", (int)sizeof(*buffr));
 
 	/* Memory Already Allocated */
 
 	/* Zero out data  and checksum */
 	memset(data_packet->data, 0, sizeof(data_packet->data));
-	memset(data_packet->checksum, 0, sizeof(data_packet->checksum));
+	data_packet->checksum = (uint16_t)0;
 
 	/* Set Packet type  */
 	data_packet->type = pkt_type;
@@ -375,10 +431,10 @@ void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqn
 
 
 	/* Construct a packet */
-	printf("Building empty packet. Packet Type: %s\n", pkt_type);
+	printf("Building empty packet. Packet Type: %d\n", pkt_type);
 
 	/* Zero out checksum */
-	memset(data_packet->checksum, 0, sizeof(data_packet->checksum));
+	data_packet->checksum = (uint16_t)0;
 
 	/* Set Packet type  */
 	data_packet->type = pkt_type;
