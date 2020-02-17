@@ -57,6 +57,7 @@ typedef struct state_t{
 	uint8_t window_size;		/* Current window size. Starts at 1, dynamically increases/decreases by factor of 2*/
 	struct sockaddr address; 	/* Destination Address */
     socklen_t sock_len; 		/* Size of address */
+	int sender;					/* Flag to determine if gbn is sender/receiver for close*/
 
 } state_t;
 

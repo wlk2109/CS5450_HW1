@@ -16,6 +16,7 @@ uint16_t checksum(uint16_t *buf, int nwords)
 ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	
 	/* TODO: Your code here. */
+	s.sender = TRUE;
 
 	/* Hint: Check the data length field 'len'.
 	 *       If it is > DATALEN, you will have to split the data
@@ -23,12 +24,20 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 *       about getting more than N * DATALEN.
 	 */
 
+
 	return(-1);
 }
 
 ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
+	s.sender = FALSE;
 	/* TODO: Your code here. */
+	/*
+	buf is a buffer of length data_len.
+	Packets are received 1 at a time.
+	
+	*/
+
 
 	return(-1);
 }
