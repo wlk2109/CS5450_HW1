@@ -55,15 +55,18 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen) {
 	/* Create SYN Packet */
 	gbnhdr *SYN_pkt = alloc_pkt();
 	build_empty_packet(SYN_pkt, SYN , s.seq_num);
+	
+	printf("Creating SYNACK\n");
 
 	/* Create SYNACK Packet */
 	gbnhdr *SYNACK_pkt = alloc_pkt();
 
+	printf("Counter = 0\n");
 	/* Begin trying to establish connection */
 	int counter = 0;
 
 	/* Try 5 attempts max */
-	while(counter > MAX_ATTEMPTS) {
+	while(counter < MAX_ATTEMPTS) {
 
 		if (s.current_state == CLOSED) {
 
@@ -396,7 +399,7 @@ uint8_t validate(gbnhdr *packet){
 		return(1);
 	}
 	
-	printf("Invalid Checksum.");
+	printf("Invalid Checksum.\n");
 	return(-1);
 };
 
