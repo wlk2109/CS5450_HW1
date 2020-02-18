@@ -146,7 +146,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 	while (s.current_state == ESTABLISHED){
 		if (attempts >= MAX_ATTEMPTS){
 			/* Max Attempts exceeded */
-			printf("Maximum attempts exceded. Exiting\n");
+			perror("Maximum attempts exceded. Exiting\n");
 			free(incoming_packet);
 			free(ACK_packet);
 			return(-1);
@@ -166,6 +166,14 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 		printf("Maybe Recv From Success\n");
 		printf("Received packet: %d. Expected Packet: %d\n", incoming_packet->seqnum, expected_seq_num);
+
+		if (incoming_packet->type != DATA){
+			perror(" Incorrect Packet Type Received. Connection out of Synch. Exiting.\n");
+			free(incoming_packet);
+			free(ACK_packet);
+			return(-1);
+		}
+
 		/* validate packet and SeqNum*/
 		if (validate(incoming_packet) && incoming_packet->seqnum == expected_seq_num){
 
@@ -196,7 +204,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 		/* Send Acknowledgement */
 		while (TRUE){
 			if (attempts<=MAX_ATTEMPTS){
-				printf("Max attempts exceed on sending ack. Connection compromised.\n");
+				perror("Max attempts exceed on sending ack. Connection compromised.\n");
 				free(incoming_packet);
 				free(ACK_packet);
 				return(-1);
@@ -215,7 +223,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 		return(recvd_bytes);
 	}
 
-	printf("Connection is not established. Exiting\n");
+	perror("Connection is not established. Exiting\n");
 
 	/* free memory, turn off timer */
 	free(incoming_packet);
@@ -225,6 +233,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 }
 
 int gbn_close(int sockfd){
+	printf("\n<---------------------- GBN_CLOSE() ---------------------->\n\n");
 
 	/* TODO: Your code here. */
 
@@ -312,6 +321,10 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen) {
 
 			return sockfd;
 		}
+		
+		printf("SYNACK Unsuccessfully received.\n");
+		
+		/* TODO: Figure out how to handle this case. */
 
 	}
 	
@@ -422,7 +435,7 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 		if (s.current_state == CLOSED){
 
 			/*TODO: Confirm this is proper Alarm spot*/
-			alarm(TIMEOUT);
+			alarm(TIMEOUT*6);
 			attempts++;
 			printf("Waiting for SYNthia...\n Attempt #: %d\n", attempts);
 
@@ -496,6 +509,10 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
             free(incoming_pkt);
             free(SYNACK_packet);
             return sockfd;
+		}
+		else{
+			printf("Invalid SYN Packet Received. Retrying.\n");
+			continue;
 		}
 
 	}
