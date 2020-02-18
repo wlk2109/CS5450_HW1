@@ -16,6 +16,7 @@ uint16_t checksum(uint16_t *buf, int nwords)
 ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	
 	/* TODO: Your code here. */
+	printf("This side is the sender.\n");
 	s.sender = TRUE;
 
 	/* Hint: Check the data length field 'len'.
@@ -23,7 +24,90 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 *       up into multiple packets - you don't have to worry
 	 *       about getting more than N * DATALEN.
 	 */
+	
+	
 
+
+	/* Get total number of packets*/
+	int total_packets = 1;
+	if (len > DATALEN){
+		
+	}
+
+	printf("Sending %d bytes of data. Total Packets = %d\n", len, total_packets);
+
+	/* send a data packet with total number of packets to expect? */
+
+	/* Count of packets sent SUCCESSFULLY
+	 * Iterate when receiving a valid acknowledgement.
+	 * track initial sequence number (in the case of a cumulative ack)
+	 */
+	uint16_t packets_sent = 0;
+
+	/* Allocate Memory for outgoing packets
+	 * Use array of packet headers *
+	 * Number of elements is the number of packets TOTAL
+	 * 
+	 */
+
+	/* Allocated memory for incoming ack packet 
+	 * Should only need 1 because ACKs are coming in 1 at a time.
+	 * 	Need a data structure to track ACKS? 
+	 */
+
+	/* Send packets.
+	 * 
+	 * 
+	 * Track number of outstanding packets. Make less than or equal to window size.
+	 * 
+	 */
+
+	/* Get Acks
+	 *
+	 * Track last_ack_recvd for duplicate?
+	 * 
+	 * If Ack is good (seq_num >= expected seq_num): 
+	 * 
+	 * -Increment packets_sent
+	 * -Increment "Consecutive Acks count?"
+	 * -Increment expected seq_num
+	 * 
+	 * If Ack is bad: (timeout/duplicate Ack).
+	 * 1. Reduce window size.
+	 * 2. Resend all packets
+	 * 
+	 * 
+	 */
+
+
+	/* Window Size:
+	 * Can either 
+	 * A. wait for all acks before sending more packets (and increase window size)
+	 * or
+	 * B. send new packets as acks come in and keep track of target_ack for window size increase
+	 * 
+	 * Performance for B likely better.
+	 */
+
+	/* CASES:
+	 * 
+	 * TODO: Make sure all of these are covered.
+	 * 
+	 * Notes: No packets sent out of order (per Piazza).
+	 * Means Duplicate Ack indicates a corrupted or lost packet
+	 * 
+	 * Full Success (packet sent, ack received in order)
+	 * 
+	 * Full Failure (Packet lost or corrupted)
+	 * - Duplicate Ack
+	 * - Timeout
+	 * 
+	 * Cumulative Success (Multi Packet Sent, Later Ack Received)
+	 * - Middle ack fails in some way
+	 * 
+	 * 
+	 * 
+	 */
 
 	return(-1);
 }
@@ -358,11 +442,9 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 		}
 		else{
 			/* Connection isn't closed */
-			/* REJECT */
+			/* TODO: REJECT (send rejection packet) */
 			printf("Rejecting connection. Socket already in use\n");
 			return(-1);
-
-			/* Backlog? */
 		}
 
 		/* Validate */
