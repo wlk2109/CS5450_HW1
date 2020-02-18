@@ -54,11 +54,12 @@ typedef struct state_t{
 	/* TODO: Your state information could be encoded here. */
 
 	int current_state;			/* CLOSED, SYN_SENT, SYN_RCVD etc...*/
-	uint32_t seq_num;			/* Current Sequence Number */
+	uint32_t seq_num;			/* Sequence Number of last ACKED Packet */
 	uint8_t window_size;		/* Current window size. Starts at 1, dynamically increases/decreases by factor of 2*/
 	struct sockaddr address; 	/* Destination Address */
     socklen_t sock_len; 		/* Size of address */
-	int sender;					/* Flag to determine if gbn is sender/receiver for close*/
+	uint8_t sender;					/* Flag to determine if gbn is sender/receiver for close*/
+	uint8_t message_complete;		/* Flag to determine if message is complete. */
 
 } state_t;
 

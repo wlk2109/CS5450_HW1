@@ -29,38 +29,116 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 }
 
 ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
-
+	printf("This side is the receiver.\n");
 	s.sender = FALSE;
-	/* TODO: Your code here. */
-	/*
-	buf is a buffer of length data_len.
-	Packets are received 1 at a time.
-	
-	Set Timer?
-	*/
+	alarm(TIMEOUT);
 
 	/* check for end of message, return 0 */
+	if (s.message_complete){
+		printf("Message transmission complete\n");
+		return 0;
+	}
 
+	printf("Last acked packet seq_num: %d\n", s.seq_num);
 	/* track expected sequence number */
-
+	uint8_t expected_seq_num = (uint8_t) s.seq_num + 1;
+	printf("Expected packet seq_num: %d (should be %d)\n", expected_seq_num, (uint8_t)s.seq_num+1 );
 	/* Allocate packet to receive? */
+	printf("Allocating incoming packet\n");
+	gbnhdr *incoming_packet = alloc_pkt();
+
+	int attempts = 0;
+	ssize_t recvd_bytes;
 
 	/*  allocate ack packet with expected sequence number */
+	printf("Building ACK packet\n");
 
-	/* while connection is established, wait for packet 
-	   maybe recv from
-	   5 tries
-	*/
+	gbnhdr *ACK_packet = alloc_pkt();
+	build_empty_packet(ACK_packet, DATAACK, expected_seq_num);
+	
+	while (s.current_state == ESTABLISHED){
+		if (attempts >= MAX_ATTEMPTS){
+			/* Max Attempts exceeded */
+			printf("Maximum attempts exceded. Exiting\n");
+			alarm(0);
+			free(incoming_packet);
+			free(ACK_packet);
+			return(-1);
+		}
+		
+		attempts++;
+		printf("Waiting to maybe recvfrom. Attempt Number: %d\n", attempts);
+		recvd_bytes = maybe_recvfrom(sockfd, incoming_packet, sizeof(*incoming_packet), flags, &s.address, &s.sock_len);
+		if(recvd_bytes == -1){
+			if (errno != EINTR) {
+				perror("Recv From Failed\n");
+				/* Attempt again */
+				continue;
+				}
+		}
 
-	/* validate packet */
-	/* validate seqnum */
-	/* if packet is wrong, send old ack. */
-	/* if packet is right, send new ack */
-	/* Check for end of message */
-	/* Change state to indicate end of message and then return 0? */
-	/* free memory */
-	/* return bytes recieved */
+		alarm(0);
 
+		printf("Maybe Recv From Success\n");
+		printf("Received packet: %d. Expected Packet: %d\n", incoming_packet->seqnum, expected_seq_num);
+		/* validate packet and SeqNum*/
+		if (validate(incoming_packet) && incoming_packet->seqnum == expected_seq_num){
+
+			/* TODO: Check payload length somehow.*/
+			size_t payload_len = len;
+
+			/* if packet is valid, write data, send new ack */
+			printf("Packet is valid. Sending acknowledgement for packet %d\n", ACK_packet->seqnum);
+			memcpy(buf, incoming_packet->data, payload_len);
+			s.seq_num++;
+			printf("Copied %d bytes to buf and increased seq_num to %d\n", payload_len, s.seq_num);
+			/* If length of received, relevant payload is less than a full data packet payload, last packet is received*/
+			if (payload_len < len){
+				printf("End of message detected.\n");
+				/* Change state to indicate end of message and then return 0? */
+				s.message_complete = TRUE;
+			}
+		}
+
+		else{
+			/* Packet is corrupted, send old ack. */
+			ACK_packet->seqnum = (uint8_t)s.seq_num;
+			printf("Packet is Corrupted or Out of Order. Sending acknowledgement %d\n", ACK_packet->seqnum);
+		}
+
+		alarm(TIMEOUT);
+		attempts = 0;
+		printf("MaybeSendTo Call\n");
+		/* Send Acknowledgement */
+		while (TRUE){
+			if (attempts<=MAX_ATTEMPTS){
+				printf("Max attempts exceed on sending ack. Connection compromised.\n");
+				free(incoming_packet);
+				free(ACK_packet);
+				return(-1);
+			}
+			attempts++;
+			if(maybe_sendto(sockfd, ACK_packet, sizeof(*ACK_packet), flags, &s.address, s.sock_len) == -1){
+				printf("Sendto Failed, retrying\n");
+				continue;
+			}
+			alarm(0);
+			break;
+		}
+		/* free memory */
+		free(incoming_packet);
+		free(ACK_packet);
+		/* return bytes recieved */
+		return(recvd_bytes);
+	}
+
+	printf("Connection is not established. Exiting\n");
+
+	/* free memory, turn off timer */
+	alarm(0);
+	free(incoming_packet);
+	free(ACK_packet);
+	
 	return(-1);
 }
 
