@@ -58,8 +58,10 @@ typedef struct state_t{
 	uint8_t window_size;		/* Current window size. Starts at 1, dynamically increases/decreases by factor of 2*/
 	struct sockaddr address; 	/* Destination Address */
     socklen_t sock_len; 		/* Size of address */
-	uint8_t sender;					/* Flag to determine if gbn is sender/receiver for close*/
-	uint8_t message_complete;		/* Flag to determine if message is complete. */
+	uint8_t sender;				/* Flag to determine if gbn is sender/receiver for close*/
+	uint8_t message_complete;	/* Flag to determine if message is complete. */
+	uint16_t num_packets;		/* Total Number of packets to expect/send */
+	uint16_t remainder;			/* Size of final packet */
 
 } state_t;
 

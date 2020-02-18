@@ -36,7 +36,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 
 	printf("Sending %d bytes of data. Total Packets = %d\n", len, total_packets);
 
-	/* send a data packet with total number of packets to expect? */
+	/* send a data packet with total number of packets to expect and remainder. */
+
 
 	/* Count of packets sent SUCCESSFULLY
 	 * Iterate when receiving a valid acknowledgement.
@@ -176,8 +177,11 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 		/* validate packet and SeqNum*/
 		if (validate(incoming_packet) && incoming_packet->seqnum == expected_seq_num){
+			
+			/* TODO: Use first packet to establish number and remainder.*/
 
 			/* TODO: Check payload length somehow.*/
+			/* TODO: Count Packets */
 			size_t payload_len = len;
 
 			/* if packet is valid, write data, send new ack */
