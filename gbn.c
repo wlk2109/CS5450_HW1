@@ -36,8 +36,30 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 	buf is a buffer of length data_len.
 	Packets are received 1 at a time.
 	
+	Set Timer?
 	*/
 
+	/* check for end of message, return 0 */
+
+	/* track expected sequence number */
+
+	/* Allocate packet to receive? */
+
+	/*  allocate ack packet with expected sequence number */
+
+	/* while connection is established, wait for packet 
+	   maybe recv from
+	   5 tries
+	*/
+
+	/* validate packet */
+	/* validate seqnum */
+	/* if packet is wrong, send old ack. */
+	/* if packet is right, send new ack */
+	/* Check for end of message */
+	/* Change state to indicate end of message and then return 0? */
+	/* free memory */
+	/* return bytes recieved */
 
 	return(-1);
 }
