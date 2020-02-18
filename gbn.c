@@ -55,13 +55,15 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 * 	Need a data structure to track ACKS? 
 	 */
 
+	printf("\n<---------------------- Sending Packets ---------------------->\n\n");
 	/* Send packets.
 	 * 
 	 * 
 	 * Track number of outstanding packets. Make less than or equal to window size.
 	 * 
 	 */
-
+	
+	printf("\n<---------------------- Receiving Acks ---------------------->\n\n");
 	/* Get Acks
 	 *
 	 * Track last_ack_recvd for duplicate?
@@ -113,9 +115,10 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 }
 
 ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
+	printf("\n<---------------------- GBN_RECV() ---------------------->\n\n");
+
 	printf("This side is the receiver.\n");
 	s.sender = FALSE;
-	alarm(TIMEOUT);
 
 	/* check for end of message, return 0 */
 	if (s.message_complete){
@@ -144,7 +147,6 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 		if (attempts >= MAX_ATTEMPTS){
 			/* Max Attempts exceeded */
 			printf("Maximum attempts exceded. Exiting\n");
-			alarm(0);
 			free(incoming_packet);
 			free(ACK_packet);
 			return(-1);
@@ -161,7 +163,6 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 				}
 		}
 
-		alarm(0);
 
 		printf("Maybe Recv From Success\n");
 		printf("Received packet: %d. Expected Packet: %d\n", incoming_packet->seqnum, expected_seq_num);
@@ -190,7 +191,6 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			printf("Packet is Corrupted or Out of Order. Sending acknowledgement %d\n", ACK_packet->seqnum);
 		}
 
-		alarm(TIMEOUT);
 		attempts = 0;
 		printf("MaybeSendTo Call\n");
 		/* Send Acknowledgement */
@@ -206,7 +206,6 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 				printf("Sendto Failed, retrying\n");
 				continue;
 			}
-			alarm(0);
 			break;
 		}
 		/* free memory */
@@ -219,7 +218,6 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 	printf("Connection is not established. Exiting\n");
 
 	/* free memory, turn off timer */
-	alarm(0);
 	free(incoming_packet);
 	free(ACK_packet);
 	
@@ -241,6 +239,8 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen) {
 	   ?. Handle rejection 
 	   ?. Handle Timeout
 	   ?. Handle Max Attempts */
+	
+	printf("\n<---------------------- GBN_CONNECT() ---------------------->\n\n");
 
 	printf("gbn_connect() called. socket: %d, server address: %d socklen: %d\n", sockfd, server->sa_family, socklen);
     printf("Current state: %d\n", s.current_state);
@@ -391,6 +391,8 @@ int gbn_socket(int domain, int type, int protocol){
 }
 
 int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
+
+	printf("\n<---------------------- GBN_ACCEPT() ---------------------->\n\n");
 
 	/* Called by receiver */
 
@@ -579,12 +581,12 @@ gbnhdr *alloc_pkt(){
 }
 
 uint8_t validate(gbnhdr *packet){
-	/*TODO: Implement*/
+
 	uint16_t rcvd_checksum = packet->checksum;
 	packet->checksum = (uint16_t)0;
 
 	uint16_t pkt_checksum = checksum((uint16_t  *)packet, sizeof(*packet) / sizeof(uint16_t));
-	printf("rcvd_checksum: %d pkt_checksum: %d\n", rcvd_checksum, pkt_checksum);
+	printf("rcvd checksum: %d. expected checksum: %d\n", rcvd_checksum, pkt_checksum);
 	
 	if (rcvd_checksum == pkt_checksum){
 		return(1);
@@ -641,6 +643,7 @@ void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqn
 }
 
 void timeout_hdler(int signum) {
+	/* TODO: SIGACTION, Not Signal SA_ONSTACK or SA_RESTART*/
 
     printf("\nTIMEOUT has occured with signum: %d\n", signum);
 
