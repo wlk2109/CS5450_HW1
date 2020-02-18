@@ -428,7 +428,7 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 	data_packet->type = pkt_type;
 
 	/* Set Packet Seqnum */
-	data_packet->seqnum = pkt_seqnum;
+	data_packet->seqnum = (uint8_t)pkt_seqnum;
 
 	/* Copy Data from buff*/
 	memcpy(data_packet->data, buffr, sizeof(*buffr));
