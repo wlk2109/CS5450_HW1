@@ -14,7 +14,8 @@ uint16_t checksum(uint16_t *buf, int nwords)
 }
 
 ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
-	
+	printf("\n<---------------------- GBN_SEND() ---------------------->\n\n");
+
 	/* TODO: Your code here. */
 	printf("This side is the sender.\n");
 	s.sender = TRUE;
@@ -25,38 +26,92 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 *       about getting more than N * DATALEN.
 	 */
 	
-	
-
 
 	/* Get total number of packets*/
-	int total_packets = 1;
+	s.num_packets = 1;
+	s.remainder = len % DATALEN;
+
 	if (len > DATALEN){
-		
+		s.num_packets = len / DATALEN;
+		if (s.num_packets*DATALEN + s.remainder != len){
+			perror("Packet division error\n");
+			return (-1);
+		}
 	}
 
-	printf("Sending %d bytes of data. Total Packets = %d\n", len, total_packets);
+	printf("Sending %d bytes of data. Total Packets = %d. Remainder = %d\n", len, s.num_packets, s.remainder);
 
-	/* send a data packet with total number of packets to expect and remainder. */
-
-
-	/* Count of packets sent SUCCESSFULLY
-	 * Iterate when receiving a valid acknowledgement.
+	
+	/* Iterate when receiving a valid acknowledgement.
 	 * track initial sequence number (in the case of a cumulative ack)
 	 */
-	uint16_t packets_sent = 0;
+	uint16_t packets_sent = 0; /* Count of packets sent SUCCESSFULLY */
+	uint32_t initial_seq_num = s.seq_num;
+	uint32_t most_recent_ack;
+	uint8_t packets_out = 0; /* Number of outstanding packets */
+	uint8_t attempts = 0;
+
+
+	/* Allocate memory for incoming ack packet 
+	 * Should only need 1 because ACKs are coming in 1 at a time.
+	 * 	Need a data structure to track ACKS? 
+	 */
+	 gbnhdr *DATAACK_packet = alloc_pkt();
+
 
 	/* Allocate Memory for outgoing packets
 	 * Use array of packet headers *
 	 * Number of elements is the number of packets TOTAL
-	 * 
+	 * Plus 1 or first packet with remainder data.
 	 */
+	gbnhdr *outgoing_packets[s.num_packets + 1];
+	
+	for (int i = 0; i < s.num_packets+1; i++){
+		uint16_t buffer_pos = i-1;
+		outgoing_packets[i] = alloc_pkt();
+		if (i == 0) {
+			printf("Building Remainder Packet.\n");
+			/* Build Remainder packets 
+			 * Total packets first, then remainder
+			 */
+			build_empty_packet(outgoing_packets[i], DATA, initial_seq_num);
+			gbnhdr *rem_packet = outgoing_packets[i];
+			printf("1\n");
+			memcpy(rem_packet->data, &s.num_packets, sizeof(s.num_packets));
+			printf("2\n");
+			memcpy(rem_packet->data+sizeof(uint16_t), &s.remainder, sizeof(s.remainder));
+			printf("Done\n");
+		}
+		else {
+			/* Build Payload packets 
+			 * Can simply start buffer at correct position, since build data packet writes 1024 each time.
+			 */
+			if (i == s.num_packets && s.remainder > 0){
+				build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+buffer_pos*DATALEN, s.remainder);
+			}
+			else{
+				build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+buffer_pos*DATALEN, 1024);
+			}
+		}
+	}
 
-	/* Allocated memory for incoming ack packet 
-	 * Should only need 1 because ACKs are coming in 1 at a time.
-	 * 	Need a data structure to track ACKS? 
-	 */
 
 	printf("\n<---------------------- Sending Packets ---------------------->\n\n");
+
+	if (packets_sent == 0){
+		printf("\n<---------------------- Sending Remainder ---------------------->\n\n");
+	}
+	while( packets_out < s.window_size){
+		
+		if (attempts >= MAX_ATTEMPTS){
+			perror("Max Attempts exceded. Exiting.\n");
+			for (int i = 0; i < s.num_packets+1; i++){
+				free(outgoing_packets[i]);
+			}
+			return (-1);
+		}
+		attempts++;
+	}
 	/* Send packets.
 	 * 
 	 * 
@@ -193,6 +248,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			if (payload_len < len){
 				printf("End of message detected.\n");
 				/* Change state to indicate end of message and then return 0? */
+				/*  TODO: Handle end of send call */
 				s.message_complete = TRUE;
 			}
 		}
@@ -617,11 +673,11 @@ uint8_t validate(gbnhdr *packet){
 	return(-1);
 };
 
-void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr){
+void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr, size_t len){
 
 	/* Construct a packet */
 
-	printf("Building packet. Paylod Length: %d\n", (int)sizeof(*buffr));
+	printf("Building packet. Paylod Length: %d\n", len);
 
 	/* Memory Already Allocated */
 
@@ -636,7 +692,7 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 	data_packet->seqnum = (uint8_t)pkt_seqnum;
 
 	/* Copy Data from buff*/
-	memcpy(data_packet->data, buffr, sizeof(*buffr));
+	memcpy(data_packet->data, buffr, len);
 
 	/* Add Checksum*/
 	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
