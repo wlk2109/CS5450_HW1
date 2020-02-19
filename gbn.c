@@ -100,7 +100,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 
 	printf("\nEntering DATA/DATAACK Loop.\n");
 	while(TRUE){
-
+		
+		printf(" Total Packets Sent %d, Num Packets %d \n", packets_sent, num_packets);
 		if (packets_sent == num_packets){
 			printf("All Packets sent\n");
 			break;
@@ -119,7 +120,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 		printf("Timeout Starting\n");
 		alarm(TIMEOUT);
 
-		while( packets_out < s.window_size){
+		while(packets_out < s.window_size && packets_out + packets_sent < num_packets){
 			
 			if (attempts >= MAX_ATTEMPTS){
 				perror("Max Attempts exceded. Exiting.\n");
@@ -267,7 +268,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 		free(outgoing_packets[j]);
 	}
 	free(DATAACK_packet);
-	return (-1);
+	return (69);
 }
 
 ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
@@ -276,12 +277,6 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 	printf("This side is the receiver.\n");
 	s.sender = FALSE;
 	int first_packet = FALSE;
-
-	/* check for end of message, return 0 */
-	if (s.message_complete){
-		printf("Message transmission complete. Awaiting FIN Packet. \n");
-		return 0;
-	}
 
 	printf("Last acked packet seq_num: %d\n", s.seq_num);
 	/* track expected sequence number */
@@ -318,6 +313,19 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 				/* Attempt again */
 				continue;
 				}
+		}
+
+			/* check for end of message, return 0 */
+		if (s.message_complete){
+			printf("Message transmission complete. Awaiting FIN Packet. \n");
+			/*
+			*
+			* If it's a FIN packet, return 0
+			* If it's a data packet keep going.
+			* s.final_seq_number = s.seqnum;
+			* s.remainder = 0;
+			*/
+			return 0;
 		}
 
 

@@ -60,7 +60,7 @@ typedef struct state_t{
     socklen_t sock_len; 		/* Size of address */
 	uint8_t sender;				/* Flag to determine if gbn is sender/receiver for close*/
 	uint8_t message_complete;	/* Flag to determine if message is complete. */
-	uint16_t final_seq_number;		/* Total Number of packets to expect/send */
+	uint32_t final_seq_number;	/* Final Expected Sequence Number */
 	uint16_t remainder;			/* Size of final packet */
 
 } state_t;
