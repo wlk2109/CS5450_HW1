@@ -611,7 +611,15 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen) {
 	int counter = 0;
 
 	/* Try 5 attempts max */
-	while(counter < MAX_ATTEMPTS) {
+	while(TRUE) {
+
+		if (counter >= MAX_ATTEMPTS){
+			printf("Reached Max attempts\n");
+            s.current_state = CLOSED;
+            free(SYN_pkt);
+            free(SYNACK_pkt);
+            return(-1);
+		}
 
 		if (s.current_state == CLOSED) {
 
@@ -664,20 +672,8 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen) {
 
 			return sockfd;
 		}
-		
-		printf("SYNACK Unsuccessfully received.\n");
-		
 		/* TODO: Figure out how to handle this case. */
-
 	}
-	
-	if (counter > MAX_ATTEMPTS) {
-		printf("Reached maximum attempts");
-		free(SYN_pkt);
-		free(SYNACK_pkt);
-		return(-1);
-	}
-
 	return(-1);
 }
 
