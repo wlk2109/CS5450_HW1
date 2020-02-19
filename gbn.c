@@ -71,7 +71,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	gbnhdr *outgoing_packets[num_packets];
 	
 	int i;
-	for (i = 0; i < num_packets+1; i++){
+	for (i = 0; i < num_packets; i++){
 		uint16_t buffer_pos = i-1;
 		outgoing_packets[i] = alloc_pkt();
 		if (i == 0) {
@@ -90,7 +90,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			/* Build Payload packets 
 			 * Can simply start buffer at correct position, since build data packet writes 1024 each time.
 			 */
-			if (i == num_packets && s.remainder > 0){
+			if (i == num_packets-1 && s.remainder > 0){
 				build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+buffer_pos*DATALEN, s.remainder);
 			}
 			else{
