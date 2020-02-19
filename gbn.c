@@ -131,10 +131,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			// alarm(TIMEOUT);
 
 		}
-		printf("Total Packets Outstanding: %d\n", packets_out);
-		printf("starting alarm\n");
 
-		alarm(TIMEOUT);
 
 		printf("Outstanding Packets saturated\n");
 		printf("Packets Sent: %d. Packets out: %d. Num_packets: %d. Window_size: %d", packets_sent, packets_out, num_packets, s.window_size);
@@ -144,6 +141,10 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 		attempts = 0;
 		while(TRUE){
 			
+			printf("Total Packets Outstanding: %d\n", packets_out);
+			printf("starting alarm\n");
+			alarm(TIMEOUT);
+
 			if (attempts >= MAX_ATTEMPTS || timeout_count >= MAX_ATTEMPTS){
 				perror("Max Attempts exceded. Exiting.\n");
 				int j;
@@ -154,7 +155,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 					return (-1);
 			}
 			
-			printf("Attempt %d. Expecting DATAACK %d, sequnece number %d\n",attempts, target_ack, s.seq_num);
+			printf("Attempt %d. Expecting DATAACK %d, Last Acked sequnece number %d\n",attempts, expected_ack, s.seq_num);
 
 			size_t recvd_bytes = maybe_recvfrom(sockfd, DATAACK_packet, sizeof(*DATAACK_packet), flags, &s.address, &s.sock_len);
 			if(recvd_bytes == -1){
@@ -239,14 +240,17 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			/* corrupted Ack: Try again?*/
 			/* TODO: Handle this better. */
 
-			printf("Invalid DATAACK or TIMEOUT, retrying receive\n");
-			printf("Reducing window_size, resending packets\n");
-			if (s.window_size >1){
-				s.window_size = s.window_size/2;
-			}
-			timeout_count++;
-			packets_out = 0;	
-			break;
+			printf("Invalid/Corrupted DATAACK Packet, retrying receive\n");
+			// printf("Reducing window_size, resending packets\n");
+			// if (s.window_size >1){
+			// 	s.window_size = s.window_size/2;
+			// }
+			// timeout_count++;
+			// packets_out = 0;	
+			// break;
+			continue;
+
+
 		/* Window Size:
 	 	* Can either 
 	 	* A. wait for all acks before sending more packets (and increase window size)
@@ -384,11 +388,16 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 				memcpy(buf, incoming_packet->data, payload_len);
 				printf("Copied %d bytes to buf and increased seq_num to %d\n", payload_len, s.seq_num);
 			}
+			else{
+				/* Packet out of order. */
+				ACK_packet->seqnum = (uint8_t)s.seq_num;
+				printf("Packet is Out of Order. Sending old acknowledgement %d\n", ACK_packet->seqnum);
+			}
 		}
 		else{
 			/* Packet is corrupted, send old ack. */
 			ACK_packet->seqnum = (uint8_t)s.seq_num;
-			printf("Packet is Corrupted or Out of Order. Sending acknowledgement %d\n", ACK_packet->seqnum);
+			printf("Packet is Corrupted. Sending old acknowledgement %d\n", ACK_packet->seqnum);
 		}
 
 		printf("MaybeSendTo Call, attempt %d\n", attempts);
