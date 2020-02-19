@@ -178,7 +178,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 				uint8_t recv_seqnum = DATAACK_packet ->	seqnum;
 				
 				/* TODO: Stress test overflow. */
-				if (recv_seqnum >= (uint8_t) expected_ack){
+				if (recv_seqnum >= (uint8_t) expected_ack || recv_seqnum <= (uint8_t)expected_ack+s.window_size){
 					/* If Ack is good (seq_num >= expected seq_num): 
 					*
 					* -Increment packets_sent
@@ -189,7 +189,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 					*/
 
 					/* Handle Cumulative ack*/
-					int packets_acked = recv_seqnum - expected_ack  + 1;
+					uint8_t packets_acked = recv_seqnum - (uint8_t) expected_ack  + 1;
 					packets_sent += packets_acked;
 					packets_out -= packets_acked;
 					most_recent_ack = s.seq_num;
@@ -459,7 +459,7 @@ int gbn_close(int sockfd){
 			
 				alarm(TIMEOUT);
 
-				if (maybe_recvfrom(sockfd, FINACK_pkt, sizeof(FINACK_pkt), 0, &s.address, s.sock_len) == -1) {
+				if (maybe_recvfrom(sockfd, FINACK_pkt, sizeof(FINACK_pkt), 0, &s.address, &s.sock_len) == -1) {
 					if (errno == EINTR) {
 						perror("TIMEOUT error in waiting for FINACK packet\n");
 					} else {

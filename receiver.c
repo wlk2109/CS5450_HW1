@@ -2,6 +2,7 @@
 
 int main(int argc, char *argv[])
 {
+
 	int sockfd;
 	int newSockfd;
 	int numRead;
