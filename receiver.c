@@ -71,12 +71,12 @@ int main(int argc, char *argv[])
 		perror("gbn_close");
 		exit(-1);
 	}
-
+	printf("Closing file");
 	/*----- Closing the file -----*/
 	if (fclose(outputFile) == EOF){
 		perror("fclose");
 		exit(-1);
 	}
-			
+	printf("File Closed");
 	return (0);
 }
