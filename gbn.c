@@ -145,6 +145,9 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 
 		}
 
+		printf("Total Packets Outstanding: %d\n", packets_out);
+		printf("starting alarm\n");
+		alarm(TIMEOUT);
 
 		printf("Outstanding Packets saturated\n");
 		printf("Packets Sent: %d. Packets out: %d. Num_packets: %d. Window_size: %d", packets_sent, packets_out, num_packets, s.window_size);
@@ -154,9 +157,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 		attempts = 0;
 		while(TRUE){
 			
-			printf("Total Packets Outstanding: %d\n", packets_out);
-			printf("starting alarm\n");
-			alarm(TIMEOUT);
+
 
 			if (attempts >= MAX_ATTEMPTS || timeout_count >= MAX_ATTEMPTS){
 				printf("timeouts %d, attempts %d\n",timeout_count, attempts);
@@ -261,8 +262,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			// }
 			// timeout_count = 0;
 			// packets_out = 0;	
-			// break;
-			continue;
+			break;
+			//continue;
 
 
 		/* Window Size:
@@ -304,17 +305,20 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 
 ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 	printf("\n<---------------------- GBN_RECV() ---------------------->\n\n");
+	printf("Start Sequence Number: %d\n",s.seq_num);
 
 	//printf("This side is the receiver.\n");
 	s.sender = FALSE;
 	int first_packet = FALSE;
 	
 	ssize_t payload_len;
-	printf("Last acked packet seq_num: %d\n", s.seq_num);
+	
+	//printf("Last acked packet seq_num: %d\n", s.seq_num);
 	/* track expected sequence number */
-	//uint8_t expected_seq_num = (uint8_t) s.seq_num + 1;
+	
 	uint8_t expected_seq_num = (uint8_t) s.seq_num + 1;
-	printf("Expected packet seq_num: %d (should be %d)\n", expected_seq_num, (uint8_t)s.seq_num+1);
+	
+	//printf("Expected packet seq_num: %d (should be %d)\n", expected_seq_num, (uint8_t)s.seq_num+1);
 	/* Allocate packet to receive? */
 	
 	//printf("Allocating incoming packet\n");
@@ -323,6 +327,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 	int attempts = 0;
 	ssize_t recvd_bytes;
+	int proper_read = FALSE;
 
 	/*  allocate ack packet with expected sequence number */
 	//printf("Building ACK packet\n");
@@ -331,6 +336,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 	build_empty_packet(ACK_packet, DATAACK, expected_seq_num);
 	
 	while (s.current_state == ESTABLISHED){
+
 		if (attempts >= MAX_ATTEMPTS){
 			/* Max Attempts exceeded */
 			perror("Maximum attempts exceded. Exiting\n");
@@ -357,8 +363,11 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 		attempts = 0;
 
 		//printf("Maybe Recv From Success\n");
-		printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
+		
+		//printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
+
 		if(validate(incoming_packet)==1){
+
 			/* Check Packet Type only if packet is not corrupted. */
 			if (incoming_packet->type != DATA){
 				if (incoming_packet->type == FIN) {
@@ -376,23 +385,25 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 			/* validate SeqNum*/
 			if (incoming_packet->seqnum == expected_seq_num){
+				printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
 				s.seq_num++;
 				payload_len = incoming_packet->payload_len;
 				//payload_len = len;
+				printf("payload len %d. Data Len %d\n",payload_len,sizeof(incoming_packet->data));
 				memcpy(buf, incoming_packet->data, payload_len);
+				proper_read = TRUE;
 				printf("\nCopied %d bytes to buf and increased seq_num to %d\n\n", payload_len, s.seq_num);
 			}
-
 			else{
 				/* Packet out of order. */
 				ACK_packet->seqnum = (uint8_t)s.seq_num;
-				printf("Packet is Out of Order. Sending old acknowledgement %d\n", ACK_packet->seqnum);
+				//printf("Packet is Out of Order. Sending old acknowledgement %d\n", ACK_packet->seqnum);
 			}
 		}
 		else{
 			/* Packet is corrupted, send old ack. */
 			ACK_packet->seqnum = (uint8_t)s.seq_num;
-			printf("Packet is Corrupted. Sending old acknowledgement %d\n", ACK_packet->seqnum);
+			//printf("Packet is Corrupted. Sending old acknowledgement %d\n", ACK_packet->seqnum);
 		}
 
 		//printf("MaybeSendTo Call, attempt %d\n", attempts);
@@ -414,15 +425,18 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			break;
 		}
 
-		printf("Send To Succeeded. ACK sent. Ack Packet: %d\n", ACK_packet->seqnum);
-		/* free memory */
-		free(incoming_packet);
-		free(ACK_packet);
-		/* return bytes recieved */
-		return(payload_len);
+		if(proper_read){
+			//printf("Send To Succeeded. ACK sent. Ack Packet: %d\n", ACK_packet->seqnum);
+			/* free memory */
+			free(incoming_packet);
+			free(ACK_packet);
+			/* return bytes recieved */
+			printf("Ending Sequence Number: %d\n",s.seq_num);
+			return(payload_len);
+		}
 	}
 
-	perror("Connection is not established. Exiting\n");
+	//perror("Connection is not established. Exiting\n");
 
 	/* free memory, turn off timer */
 	free(incoming_packet);
@@ -972,7 +986,7 @@ void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqn
 
 
 	/* Construct a packet */
-	printf("Building empty packet. Packet Type: %d\n", pkt_type);
+	//printf("Building empty packet. Packet Type: %d\n", pkt_type);
 
 	/* Zero out checksum */
 	data_packet->checksum = (uint16_t)0;
