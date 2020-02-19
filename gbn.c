@@ -28,6 +28,10 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 		num_packets = len / DATALEN;
 	}
 
+	if (remainder >0) {
+		num_packets++;
+	}
+
 	// printf("Num Packets: %d, remainder %d\n",num_packets, remainder);
 	// return (-1);
 
@@ -185,7 +189,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			printf("Target Packet: %d, Seq_num = %d\n\n", expected_ack, (uint8_t) expected_ack);
 			
 			/* Process Ack */
-			if (validate(DATAACK_packet) && DATAACK_packet->type == DATAACK){
+			if ((validate(DATAACK_packet) == TRUE) && DATAACK_packet->type == DATAACK){
 			
 				uint8_t recv_seqnum = DATAACK_packet ->	seqnum;
 				
@@ -350,7 +354,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 		//printf("Maybe Recv From Success\n");
 		printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
-		if(validate(incoming_packet)){
+		if((validate(incoming_packet) == TRUE)){
 			/* Check Packet Type only if packet is not corrupted. */
 			if (incoming_packet->type != DATA){
 				if (incoming_packet->type == FIN) {
@@ -479,7 +483,7 @@ int gbn_close(int sockfd){
 					continue;
 				}
 			}
-			if ((FINACK_pkt->type == FINACK) && (validate(FINACK_pkt) == 1)) {
+			if ((FINACK_pkt->type == FINACK) && (validate(FINACK_pkt) == TRUE)) {
 				alarm(0);
 				printf("Recieved FINACK packet successfully\n");
 				free(FIN_pkt);
@@ -522,7 +526,7 @@ int gbn_close(int sockfd){
 					continue;
 				}
 
-				if ((FIN_pkt->type == FIN) && (validate(FIN_pkt) == 1)) {
+				if ((FIN_pkt->type == FIN) && (validate(FIN_pkt) == TRUE)) {
 					alarm(0);
 					printf("Recieved FIN packet successfully\n");
 					s.current_state = FIN_RCVD;
@@ -634,7 +638,7 @@ int gbn_connect(int sockfd, const struct sockaddr *server, socklen_t socklen) {
 			}
 		}
 
-		if ((SYNACK_pkt->type == SYNACK) && (validate(SYNACK_pkt) == 1)) {
+		if ((SYNACK_pkt->type == SYNACK) && (validate(SYNACK_pkt) == TRUE)) {
 
 			alarm(0);
 			printf("Recieved SYNACK packet successfully\n");
@@ -782,7 +786,7 @@ int gbn_accept(int sockfd, struct sockaddr *client, socklen_t *socklen){
 		}
 
 		/* Validate */
-		if ((incoming_pkt->type == SYN) && (validate(incoming_pkt))){
+		if ((incoming_pkt->type == SYN) && (validate(incoming_pkt) == TRUE)) {
 			
 			printf("SYN City\n");
 
@@ -928,7 +932,7 @@ uint8_t validate(gbnhdr *packet){
 	}
 	
 	printf("Invalid Checksum.\n");
-	return(FALSE);
+	return (FALSE);
 };
 
 void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum, const void *buffr, size_t len){
