@@ -108,7 +108,6 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 				free(DATAACK_packet);
 				return (-1);
 			}
-			attempts++;
 
 			printf("Window size is %d\n", s.window_size);
 			
@@ -118,17 +117,24 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			if(maybe_sendto(sockfd, out_pkt, sizeof(*out_pkt), flags, &s.address, s.sock_len) == -1){
 				printf("Send to Failed, retrying\n");
 				/* Reset Timeout*/
+				attempts++;
 				continue;
 			}
+
 			printf("Successfully Sent Packet %d. Sequence Num: %d\n", packets_sent + packets_out, out_pkt->seqnum);
+			attempts = 0;
 			packets_out++;
 
-			printf("Total Packets Outstanding: %d\n", packets_out);
-			printf("starting alarm");
-			alarm(0);
-			alarm(TIMEOUT);
+			// printf("Total Packets Outstanding: %d\n", packets_out);
+			// printf("starting alarm");
+
+			// alarm(TIMEOUT);
 
 		}
+		printf("Total Packets Outstanding: %d\n", packets_out);
+		printf("starting alarm\n");
+
+		alarm(TIMEOUT);
 
 		printf("Outstanding Packets saturated\n");
 		printf("Packets Sent: %d. Packets out: %d. Num_packets: %d. Window_size: %d", packets_sent, packets_out, num_packets, s.window_size);
@@ -138,7 +144,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 		attempts = 0;
 		while(TRUE){
 			
-			if (attempts >= MAX_ATTEMPTS){
+			if (attempts >= MAX_ATTEMPTS || timeout_count >= MAX_ATTEMPTS){
 				perror("Max Attempts exceded. Exiting.\n");
 				int j;
 				for (j = 0; j < num_packets; j++){
@@ -148,8 +154,6 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 					return (-1);
 			}
 			
-			attempts++;
-
 			printf("Attempt %d. Expecting DATAACK %d, sequnece number %d\n",attempts, target_ack, s.seq_num);
 
 			size_t recvd_bytes = maybe_recvfrom(sockfd, DATAACK_packet, sizeof(*DATAACK_packet), flags, &s.address, &s.sock_len);
@@ -157,6 +161,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 				if (errno != EINTR) {
 					perror("Recv From Failed. Retrying\n");
 					/* Attempt again */
+					attempts++;
 					continue;
 					}
 				else{
@@ -168,9 +173,11 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 					break;
 				}
 			}
+			/* Reset Attempts */
+			attempts = 0;
 
 			printf("Received Packet. Type: %d, seq_num %d\n", DATAACK_packet->type, DATAACK_packet->seqnum);
-			printf("Target Packet: %d, Seq_num = %d\n", expected_ack, (uint8_t) expected_ack);
+			printf("Target Packet: %d, Seq_num = %d\n\n", expected_ack, (uint8_t) expected_ack);
 			
 			/* Process Ack */
 			if (validate(DATAACK_packet) && DATAACK_packet->type == DATAACK){
@@ -179,6 +186,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 				
 				/* TODO: Stress test overflow. */
 				if (recv_seqnum >= (uint8_t) expected_ack || recv_seqnum <= (uint8_t)expected_ack+s.window_size){
+
+					printf("Seq Num Received: %d. Expected Ack %d\n\n",recv_seqnum,(uint8_t)expected_ack);
 					/* If Ack is good (seq_num >= expected seq_num): 
 					*
 					* -Increment packets_sent
@@ -188,13 +197,17 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 					* -Reset Timer, Break and send more packets
 					*/
 
+					alarm(0);
+					timeout_count = 0;
+
 					/* Handle Cumulative ack*/
-					uint8_t packets_acked = recv_seqnum - (uint8_t) expected_ack  + 1;
+					uint8_t packets_acked = (recv_seqnum - (uint8_t) expected_ack)  + 1;
 					packets_sent += packets_acked;
 					packets_out -= packets_acked;
 					most_recent_ack = s.seq_num;
 					s.seq_num += packets_acked;
 					expected_ack = s.seq_num +1;
+					printf("Total Packets Acked: %d. New packets Out: %d\n", packets_acked, packets_out);
 
 					if (s.seq_num >= target_ack){
 						printf("Received target ack %d\n", target_ack);
@@ -203,8 +216,6 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 						printf("Increasing Window Size to%d\n",s.window_size);
 					}
 
-					alarm(0);
-					alarm(TIMEOUT);
 					break;
 
 				}
@@ -214,6 +225,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 				 * 2. Set packets_out to 0.
 				 * 3. Break and resend all packets
 				 */ 
+					alarm(0);
+					timeout_count = 0;
 					printf("Reducing window size\n");
 					if (s.window_size >1){
 						s.window_size = s.window_size/2;
@@ -307,19 +320,21 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			return(-1);
 		}
 		
-		attempts++;
+		
 		printf("Waiting to maybe recvfrom. Attempt Number: %d\n", attempts);
 		recvd_bytes = maybe_recvfrom(sockfd, incoming_packet, sizeof(*incoming_packet), flags, &s.address, &s.sock_len);
 		if(recvd_bytes == -1){
 			if (errno != EINTR) {
 				perror("Recv From Failed\n");
 				/* Attempt again */
+				attempts++;
 				continue;
 				}
 			else{
 				perror("Timeout Occured");
 			}
 		}
+		attempts = 0;
 
 			/* check for end of message, return 0 */
 		// if (s.message_complete){
@@ -346,38 +361,37 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 		printf("Maybe Recv From Success\n");
 		printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
-
-		if (incoming_packet->type != DATA){
-			if (incoming_packet->type == FIN) {
-				printf("FIN Packet Received. Changing State.");
-				s.current_state = FIN_RCVD;
+		if(validate(incoming_packet)){
+			/* Check Packet Type only if packet is not corrupted. */
+			if (incoming_packet->type != DATA){
+				if (incoming_packet->type == FIN) {
+					printf("FIN Packet Received. Changing State.");
+					s.current_state = FIN_RCVD;
+					free(incoming_packet);
+					free(ACK_packet);
+					return 0;
+				}
+				perror("Incorrect Packet Type Received. Connection out of Synch. Exiting.\n");
 				free(incoming_packet);
 				free(ACK_packet);
-				return 0;
+				return(-1);
 			}
-			perror("Incorrect Packet Type Received. Connection out of Synch. Exiting.\n");
-			free(incoming_packet);
-			free(ACK_packet);
-			return(-1);
-		}
 
-		/* validate packet and SeqNum*/
-		if (validate(incoming_packet) && incoming_packet->seqnum == expected_seq_num){
-			s.seq_num++;
-			payload_len = len;
-			memcpy(buf, incoming_packet->data, payload_len);
-			printf("Copied %d bytes to buf and increased seq_num to %d\n", payload_len, s.seq_num);
+			/* validate SeqNum*/
+			if (incoming_packet->seqnum == expected_seq_num){
+				s.seq_num++;
+				payload_len = len;
+				memcpy(buf, incoming_packet->data, payload_len);
+				printf("Copied %d bytes to buf and increased seq_num to %d\n", payload_len, s.seq_num);
+			}
 		}
-
 		else{
 			/* Packet is corrupted, send old ack. */
 			ACK_packet->seqnum = (uint8_t)s.seq_num;
 			printf("Packet is Corrupted or Out of Order. Sending acknowledgement %d\n", ACK_packet->seqnum);
 		}
 
-		attempts = 0;
 		printf("MaybeSendTo Call, attempt %d\n", attempts);
-
 		/* Send Acknowledgement */
 		while (TRUE){
 			if (attempts>=MAX_ATTEMPTS){
@@ -386,11 +400,13 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 				free(ACK_packet);
 				return(-1);
 			}
-			attempts++;
+
 			if(maybe_sendto(sockfd, ACK_packet, sizeof(*ACK_packet), flags, &s.address, s.sock_len) == -1){
 				printf("Sendto Failed, retrying\n");
+				attempts++;
 				continue;
 			}
+			attempts = 0;
 			break;
 		}
 
