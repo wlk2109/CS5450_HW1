@@ -28,18 +28,18 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	
 
 	/* Get total number of packets*/
-	int num_packets = 2; /* Min Number of packets */
-	s.remainder = len % DATALEN;
+	int num_packets = 1; /* Min Number of packets */
+	// s.remainder = len % DATALEN +1;
 
 	if (len > DATALEN){
-		num_packets =1 + len / DATALEN;
-		if (num_packets*DATALEN + s.remainder != len){
-			perror("Packet division error\n");
-			return (-1);
-		}
+		num_packets = 2 + len / DATALEN;
+		// if (num_packets*DATALEN + s.remainder != len+1){
+		// 	perror("Packet division error\n");
+		// 	return (-1);
+		// }
 	}
 
-	s.final_seq_number = s.seq_num + num_packets;
+	//s.final_seq_number = s.seq_num + num_packets;
 
 	printf("Sending %d bytes of data. Total Packets = %d. Remainder = %d\n", len, num_packets, s.remainder);
 
@@ -71,34 +71,46 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 */
 	gbnhdr *outgoing_packets[num_packets];
 	
-	int i;
-	for (i = 0; i < num_packets; i++){
-		uint16_t buffer_pos = i-1;
-		outgoing_packets[i] = alloc_pkt();
-		if (i == 0) {
-			printf("Building Remainder Packet.\n");
-			/* Build Remainder packets 
-			 * Total packets first, then remainder
-			 */
-			gbnhdr *rem_packet = outgoing_packets[i];
-			uint16_t remainder_info[2];
-			remainder_info[0] = num_packets;
-			remainder_info[1] = s.remainder;
-			build_data_packet(rem_packet, DATA, initial_seq_num, remainder_info, sizeof(remainder_info));
-			printf("Done\n");
+	// int i;
+	// for (i = 0; i < num_packets; i++){
+	// 	uint16_t buffer_pos = i-1;
+	// 	outgoing_packets[i] = alloc_pkt();
+	// 	if (i == 0) {
+	// 		printf("Building Remainder Packet.\n");
+	// 		/* Build Remainder packets 
+	// 		 * Total packets first, then remainder
+	// 		 */
+	// 		gbnhdr *rem_packet = outgoing_packets[i];
+	// 		uint8_t remainder_info[5];
+	// 		memcpy(remainder_info, buf, 1);
+	// 		remainder_info[1] = num_packets;
+	// 		remainder_info[3] = s.remainder;
+	// 		// memcpy(temp, remainder_info, sizeof(remainder_info));
+	// 		build_data_packet(rem_packet, DATA, initial_seq_num, remainder_info, sizeof(remainder_info));
+	// 		printf("Done\n");
+	// 	}
+	// 	else {
+	// 		/* Build Payload packets 
+	// 		 * Can simply start buffer at correct position, since build data packet writes 1024 each time.
+	// 		 */
+	// 		if (i == num_packets-1 && s.remainder > 0){
+	// 			build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+1+buffer_pos*DATALEN, s.remainder);
+	// 		}
+	// 		else{
+	// 			build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+1+buffer_pos*DATALEN, 1024);
+	// 		}
+	// 	}
+	// }
+
+		int i;
+		for (i = 0; i < num_packets; i++){
+			uint16_t buffer_pos = i;
+			outgoing_packets[i] = alloc_pkt();
+				/* Build Payload packets 
+				* Can simply start buffer at correct position, since build data packet writes 1024 each time.
+				*/
+			build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+buffer_pos*DATALEN, 1024);
 		}
-		else {
-			/* Build Payload packets 
-			 * Can simply start buffer at correct position, since build data packet writes 1024 each time.
-			 */
-			if (i == num_packets-1 && s.remainder > 0){
-				build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+buffer_pos*DATALEN, s.remainder);
-			}
-			else{
-				build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+buffer_pos*DATALEN, 1024);
-			}
-		}
-	}
 
 	printf("\nEntering DATA/DATAACK Loop.\n");
 	while(TRUE){
@@ -309,6 +321,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 	printf("This side is the receiver.\n");
 	s.sender = FALSE;
 	int first_packet = FALSE;
+	ssize_t payload_len;
 
 	printf("Last acked packet seq_num: %d\n", s.seq_num);
 	/* track expected sequence number */
@@ -362,6 +375,8 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			*/
 			if (incoming_packet->type == FIN) {
 				s.current_state = FIN_RCVD;
+				free(incoming_packet);
+				free(ACK_packet);
 				return 0;
 			}
 
@@ -375,7 +390,14 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 		printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
 
 		if (incoming_packet->type != DATA){
-			perror(" Incorrect Packet Type Received. Connection out of Synch. Exiting.\n");
+			if (incoming_packet->type == FIN) {
+				printf("FIN Packet Received. Changing State.");
+				s.current_state = FIN_RCVD;
+				free(incoming_packet);
+				free(ACK_packet);
+				return 0;
+			}
+			perror("Incorrect Packet Type Received. Connection out of Synch. Exiting.\n");
 			free(incoming_packet);
 			free(ACK_packet);
 			return(-1);
@@ -384,50 +406,45 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 		/* validate packet and SeqNum*/
 		if (validate(incoming_packet) && incoming_packet->seqnum == expected_seq_num){
 
-			printf("final seq: %d, Remainder %d, Seq Number: %d \n\n",s.final_seq_number, s.remainder, s.seq_num);
-			if (s.final_seq_number == s.seq_num && s.remainder == 0){
-				/* we know this is the first packet sent*/
-				first_packet = TRUE;
-				uint16_t remainder_info[2];
-				memcpy(remainder_info,incoming_packet->data, sizeof(remainder_info));
+			// printf("final seq: %d, Remainder %d, Seq Number: %d \n\n",s.final_seq_number, s.remainder, s.seq_num);
+			// if (s.final_seq_number == s.seq_num && s.remainder == 0){
+			// 	/* we know this is the first packet sent*/
+			// 	first_packet = TRUE;
+			// 	payload_len = 1;
+			// 	uint16_t remainder_info[2];
+			// 	uint8_t *buf_start = incoming_packet->data +1;
+			// 	memcpy(remainder_info, buf_start, sizeof(remainder_info));
 
-				printf("Setting First Packet Data. Num Packets: %d, Remainder %d\n\n",remainder_info[0], remainder_info[1]);
+			// 	printf("Setting First Packet Data. Num Packets: %d, Remainder %d\n\n",remainder_info[0], remainder_info[1]);
 
-				s.final_seq_number = s.seq_num + remainder_info[0];
-				s.remainder = remainder_info[1];
-				if (s.remainder == 0){
-					s.remainder = DATALEN;
-				}
-			}
+			// 	s.final_seq_number = s.seq_num + remainder_info[0];
+			// 	s.remainder = remainder_info[1];
+			// 	if (s.remainder == 0){
+			// 		s.remainder = DATALEN;
+			// 	}
+			// }
 			
 			s.seq_num++;
 
-			/* TODO: Check payload length somehow.*/
-			/* TODO: Count Packets */
-			
-			/* if packet is valid, write data, send new ack */
-			printf("Packet is valid. Sending acknowledgement for packet %d\n", ACK_packet->seqnum);
+			// /* if packet is valid, write data, send new ack */
+			// printf("Packet is valid. Sending acknowledgement for packet %d\n", ACK_packet->seqnum);
 
-			size_t payload_len;
-			if(s.seq_num == s.final_seq_number){
-				payload_len = s.remainder;
-				printf("End of message detected.\n");
-				/* Change state to indicate end of message and then return 0? */
-				/*  TODO: Handle end of send call */
-				s.message_complete = TRUE;
-			}
-			else{
-				payload_len = len;
-			}
+			// if(s.seq_num == s.final_seq_number){
+			// 	payload_len = s.remainder;
+			// 	printf("End of message detected.\n");
+			// 	/* Change state to indicate end of message and then return 0? */
+			// 	/*  TODO: Handle end of send call */
+			// 	s.message_complete = TRUE;
+			// }
+			// else{
+			// 	payload_len = len;
+			// }
 
+			payload_len = len;
 
-
-			if (first_packet != TRUE){
-				memcpy(buf, incoming_packet->data, payload_len);
-				printf("Copied %d bytes to buf and increased seq_num to %d\n", payload_len, s.seq_num);
-			}
-
-			
+			memcpy(buf, incoming_packet->data, payload_len);
+			printf("Copied %d bytes to buf and increased seq_num to %d\n", payload_len, s.seq_num);
+		
 		}
 
 		else{
@@ -459,7 +476,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 		free(incoming_packet);
 		free(ACK_packet);
 		/* return bytes recieved */
-		return(recvd_bytes);
+		return(payload_len);
 	}
 
 	perror("Connection is not established. Exiting\n");
