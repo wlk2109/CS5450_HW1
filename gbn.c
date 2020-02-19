@@ -427,8 +427,140 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 int gbn_close(int sockfd){
 	printf("\n<---------------------- GBN_CLOSE() ---------------------->\n\n");
 
-	/* TODO: Your code here. */
+	printf("gbn_close() called. socket: %d\n", sockfd);
+    printf("Current state: %d\n", s.current_state);
 
+	/* logic for sender */
+	if (s.sender == TRUE) {
+		
+		int counter = 0;
+
+		gbnhdr *FIN_pkt = alloc_pkt();
+		build_empty_packet(FIN_pkt, FIN, s.seq_num);
+
+		gbnhdr *FINACK_pkt = alloc_pkt();
+
+		printf("FIN and FINACK packet created\n");
+
+		while (TRUE) {
+
+			if (counter >= MAX_ATTEMPTS) {
+				printf("Reached Max attempts");
+				s.current_state = CLOSED;
+				free(FIN_pkt);
+				free(FINACK_pkt);
+				return(-1);
+			}
+
+			if (s.current_state != CLOSED) {
+
+				printf("Sending FIN packet. Seqnum: %d\n", FIN_pkt->seqnum);
+				counter++; 
+
+				if (maybe_sendto(sockfd, FIN_pkt, sizeof(FIN_pkt), 0, &s.address, s.sock_len) == -1) {
+					perror("Sending FIN Packet returned an error\n");
+					free(FIN_pkt);
+					free(FINACK_pkt);
+					continue;
+				}
+
+				s.current_state = FIN_SENT;
+				printf("Changed current state to FIN_SENT now waiting for FIN_ACK\n");
+			}
+			
+			if (s.current_state == FIN_SENT) {
+			
+				alarm(TIMEOUT);
+
+				if (maybe_recvfrom(sockfd, FINACK_pkt, sizeof(FINACK_pkt), 0, &s.address, s.sock_len) == -1) {
+					if (errno == EINTR) {
+						perror("TIMEOUT error in waiting for FINACK packet\n");
+					} else {
+						perror("Error in recieving FINACK packet\n");
+					}
+					continue;
+				}
+			}
+			if ((FINACK_pkt->type == FINACK) && (validate(FINACK_pkt) == 1)) {
+				alarm(0);
+				printf("Recieved FINACK packet successfully\n");
+				free(FIN_pkt);
+				free(FINACK_pkt);
+				s.current_state = CLOSED;
+				return 1; 
+			}
+		}	
+	/* logic for receiver */
+	} else {
+
+		gbnhdr *FINACK_pkt = alloc_pkt();
+		build_empty_packet(FINACK_pkt, FINACK, s.seq_num);
+
+		gbnhdr *FIN_pkt = alloc_pkt();
+		
+		if (s.current_state == FIN_SENT) {
+			int counter = 0;
+
+			while(TRUE){
+				
+				if (counter >= MAX_ATTEMPTS) {
+					free(FINACK_pkt);
+					free(FIN_pkt);
+					printf("Reached Maximum attempts");
+					s.current_state = CLOSED;
+					return -1;
+				}
+
+				alarm(TIMEOUT);
+				
+				counter++;
+				if (maybe_recvfrom(sockfd, FIN_pkt, sizeof(FIN_pkt), 0, &s.address, s.sock_len) == -1) {
+					
+					if (errno == EINTR) {
+						perror("TIMEOUT error in waiting for FINACK packet\n");
+					} else {
+						perror("Error in recieving FINACK packet\n");
+					}
+					continue;
+				}
+
+				if ((FIN_pkt->type == FIN) && (validate(FIN_pkt) == 1)) {
+					alarm(0);
+					printf("Recieved FIN packet successfully\n");
+					s.current_state = FIN_RCVD;
+				}
+			}
+		}
+
+		if (s.current_state == FIN_RCVD) {
+			int counter = 0; 
+			
+			while(TRUE) {
+				if (counter >= MAX_ATTEMPTS) {
+					free(FINACK_pkt);
+					free(FIN_pkt);
+					printf("Reached Maximum attempts");
+					s.current_state = CLOSED;
+					return -1;
+				}
+
+				printf("Sending FINACK packet. Seqnum: %d\n", FINACK_pkt->seqnum);
+				counter++; 
+
+				if (maybe_sendto(sockfd, FINACK_pkt, sizeof(FINACK_pkt), 0, &s.address, s.sock_len) == -1) {
+					perror("Sending FINACK Packet returned an error\n");
+					free(FIN_pkt);
+					free(FINACK_pkt);
+					continue;
+				}
+
+				s.current_state = CLOSED; 
+				free(FIN_pkt);
+				free(FINACK_pkt);
+				return 1;
+			}
+		}
+	}
 	return(-1);
 }
 
