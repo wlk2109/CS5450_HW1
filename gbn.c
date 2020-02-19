@@ -209,7 +209,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 					
 
 					if (s.seq_num >= target_ack){
-						printf("Received target ack %d", target_ack);
+						printf("Received target ack %d\n", target_ack);
 						s.window_size = 2*s.window_size;
 						target_ack = most_recent_ack + s.window_size; 
 						printf("Increasing Window Size to%d\n",s.window_size);
@@ -220,15 +220,21 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 					break;
 
 				}
-
+				else{
 				/* If Ack is bad: (timeout/duplicate Ack).
-				* 1. Reduce window size.
-				* 2. Set packets_out to 0.
-				* 3. Break and resend all packets
-				*/ 
+				 * 1. Reduce window size.
+				 * 2. Set packets_out to 0.
+				 * 3. Break and resend all packets
+				 */ 
+					printf("Reducing window size\n");
+					s.window_size = s.window_size/2;
+					packets_out = 0;
+					break;
+				}
 			}
 
 			/* corrupted Ack: Try again?*/
+			/* TODO: Handle this better. */
 			printf("Invalid DATAACK, retrying receive\n");
 			
 
