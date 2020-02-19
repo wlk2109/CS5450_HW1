@@ -28,6 +28,10 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 		num_packets = len / DATALEN;
 	}
 
+	if (remainder>0){
+		num_packets++;
+	}
+
 	// printf("Num Packets: %d, remainder %d\n",num_packets, remainder);
 	// return (-1);
 
@@ -62,15 +66,21 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 * Plus 1 or first packet with remainder data.
 	 */
 	gbnhdr *outgoing_packets[num_packets];
+	printf("Total bytes in payload: %d\n",sizeof(*buf));
 
 		int i;
 		for (i = 0; i < num_packets; i++){
-			uint16_t buffer_pos = i;
 			outgoing_packets[i] = alloc_pkt();
 				/* Build Payload packets 
 				* Can simply start buffer at correct position, since build data packet writes 1024 each time.
 				*/
-			build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+buffer_pos*DATALEN, 1024);
+			if (i == num_packets -1 && remainder >0){
+				build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+i*DATALEN, remainder);
+			}
+			else{
+				build_data_packet(outgoing_packets[i], DATA, initial_seq_num + i, buf+i*DATALEN, 1024);
+			}
+			//printf("Building Data Packet. Starting Byte = %d. Ending Byte = %d\n", i*DATALEN, i*DATALEN+1023);
 		}
 
 	printf("\nEntering DATA/DATAACK Loop.\n");
@@ -282,16 +292,14 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 * 
 	 * Cumulative Success (Multi Packet Sent, Later Ack Received)
 	 * - Middle ack fails in some way
-	 * 
-	 * 
-	 * 
 	 */
+
 	int j;
 	for (j = 0; j < num_packets; j++){
 		free(outgoing_packets[j]);
 	}
 	free(DATAACK_packet);
-	return (69);
+	return (DATALEN*N);
 }
 
 ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
@@ -350,7 +358,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 		//printf("Maybe Recv From Success\n");
 		printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
-		if(validate(incoming_packet)){
+		if(validate(incoming_packet)==1){
 			/* Check Packet Type only if packet is not corrupted. */
 			if (incoming_packet->type != DATA){
 				if (incoming_packet->type == FIN) {
@@ -369,11 +377,12 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			/* validate SeqNum*/
 			if (incoming_packet->seqnum == expected_seq_num){
 				s.seq_num++;
-				// payload_len = incoming_packet->payload_len;
-				payload_len = len;
+				payload_len = incoming_packet->payload_len;
+				//payload_len = len;
 				memcpy(buf, incoming_packet->data, payload_len);
 				printf("\nCopied %d bytes to buf and increased seq_num to %d\n\n", payload_len, s.seq_num);
 			}
+
 			else{
 				/* Packet out of order. */
 				ACK_packet->seqnum = (uint8_t)s.seq_num;
@@ -935,7 +944,7 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 
 	/* Construct a packet */
 
-	printf("Building packet. Paylod Length: %d\n", len);
+	printf("Building packet. Paylod Length  : %d\n", len);
 
 	/* Memory Already Allocated */
 
@@ -951,6 +960,7 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 
 	/* Copy Data from buff*/
 	memcpy(data_packet->data, buffr, len);
+	data_packet->payload_len = len;
 
 	/* Add Checksum*/
 	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
