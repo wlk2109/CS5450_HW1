@@ -48,12 +48,12 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 * track initial sequence number (in the case of a cumulative ack)
 	 */
 	uint16_t packets_sent = 0; /* Count of packets sent SUCCESSFULLY */
-	uint32_t initial_seq_num = s.seq_num;
+	uint32_t initial_seq_num = s.seq_num+1; /* First Non-Acked SeqNum */
 	uint32_t most_recent_ack;
 	uint32_t target_ack = packets_sent + s.window_size; /* Ack for window expansions*/
 	uint8_t packets_out = 0; /* Number of outstanding packets */
 	uint8_t attempts = 0;
-	uint32_t expected_ack = s.seq_num;
+	uint32_t expected_ack = initial_seq_num;
 
 
 	/* Allocate memory for incoming ack packet 
@@ -68,9 +68,10 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 * Number of elements is the number of packets TOTAL
 	 * Plus 1 or first packet with remainder data.
 	 */
-	gbnhdr *outgoing_packets[num_packets + 1];
+	gbnhdr *outgoing_packets[num_packets];
 	
-	for (int i = 0; i < num_packets+1; i++){
+	int i;
+	for (i = 0; i < num_packets+1; i++){
 		uint16_t buffer_pos = i-1;
 		outgoing_packets[i] = alloc_pkt();
 		if (i == 0) {
@@ -124,7 +125,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			
 			if (attempts >= MAX_ATTEMPTS){
 				perror("Max Attempts exceded. Exiting.\n");
-				for (int j = 0; j < num_packets+1; j++){
+				int j;
+				for (j = 0; j < num_packets+1; j++){
 					free(outgoing_packets[j]);
 				}
 				free(DATAACK_packet);
@@ -160,7 +162,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			
 			if (attempts >= MAX_ATTEMPTS){
 				perror("Max Attempts exceded. Exiting.\n");
-				for (int j = 0; j < num_packets+1; j++){
+				int j;
+				for (j = 0; j < num_packets+1; j++){
 					free(outgoing_packets[j]);
 				}
 				free(DATAACK_packet);
@@ -269,8 +272,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 * 
 	 * 
 	 */
-
-	for (int j = 0; j < num_packets+1; j++){
+	int j;
+	for (j = 0; j < num_packets+1; j++){
 		free(outgoing_packets[j]);
 	}
 	free(DATAACK_packet);
@@ -286,8 +289,8 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 	printf("Last acked packet seq_num: %d\n", s.seq_num);
 	/* track expected sequence number */
-	uint8_t expected_seq_num = (uint8_t) s.seq_num;
-	printf("Expected packet seq_num: %d (should be %d)\n", expected_seq_num, (uint8_t)s.seq_num );
+	uint8_t expected_seq_num = (uint8_t) s.seq_num + 1;
+	printf("Expected packet seq_num: %d (should be %d)\n", expected_seq_num, (uint8_t)s.seq_num+1);
 	/* Allocate packet to receive? */
 	printf("Allocating incoming packet\n");
 	gbnhdr *incoming_packet = alloc_pkt();
@@ -355,14 +358,14 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 		/* validate packet and SeqNum*/
 		if (validate(incoming_packet) && incoming_packet->seqnum == expected_seq_num){
 
-			printf("final seq: %d, Remainder %d, Seq Number: %d \n",s.final_seq_number, s.remainder, s.seq_num);
+			printf("final seq: %d, Remainder %d, Seq Number: %d \n\n",s.final_seq_number, s.remainder, s.seq_num);
 			if (s.final_seq_number == s.seq_num && s.remainder == 0){
 				/* we know this is the first packet sent*/
 				first_packet = TRUE;
 				uint16_t remainder_info[2];
 				memcpy(remainder_info,incoming_packet->data, sizeof(remainder_info));
 
-				printf("Num Packets: %d, Remainder %d\n",remainder_info[0], remainder_info[1]);
+				printf("Setting First Packet Data. Num Packets: %d, Remainder %d\n\n",remainder_info[0], remainder_info[1]);
 
 				s.final_seq_number = s.seq_num + remainder_info[0];
 				s.remainder = s.seq_num + remainder_info[1];
@@ -389,21 +392,14 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 				payload_len = len;
 			}
 
+			s.seq_num++;
 
 			if (first_packet != TRUE){
 				memcpy(buf, incoming_packet->data, payload_len);
 				printf("Copied %d bytes to buf and increased seq_num to %d\n", payload_len, s.seq_num);
 			}
 
-			s.seq_num++;
-			/* If length of received, relevant payload is less than a full data packet payload, last packet is received
-			if (payload_len < len){
-				printf("End of message detected.\n");
-				/* Change state to indicate end of message and then return 0? 
-				/*  TODO: Handle end of send call 
-				s.message_complete = TRUE;
-			}
-			*/
+			
 		}
 
 		else{
@@ -429,6 +425,8 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			}
 			break;
 		}
+
+		printf("Send To Succeeded. ACK sent. Ack Packet: %d\n", ACK_packet->seqnum);
 		/* free memory */
 		free(incoming_packet);
 		free(ACK_packet);
@@ -900,8 +898,7 @@ ssize_t maybe_recvfrom(int  s, char *buf, size_t len, int flags, struct sockaddr
 	return(len);  /* Simulate a success */
 }
 
-ssize_t maybe_sendto(int  s, const void *buf, size_t len, int flags, \
-                     const struct sockaddr *to, socklen_t tolen){
+ssize_t maybe_sendto(int  s, const void *buf, size_t len, int flags, const struct sockaddr *to, socklen_t tolen){
 
     char *buffer = malloc(len);
     memcpy(buffer, buf, len);
