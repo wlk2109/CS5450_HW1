@@ -335,9 +335,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 	/*  allocate ack packet with expected sequence number */
 	//printf("Building ACK packet\n");
-
 	gbnhdr *ACK_packet = alloc_pkt();
-	build_empty_packet(ACK_packet, DATAACK, expected_seq_num);
 	
 	while (s.current_state == ESTABLISHED){
 
@@ -392,6 +390,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 				s.seq_num++;
 				payload_len = incoming_packet->payload_len;
 				//payload_len = len;
+				build_empty_packet(ACK_packet, DATAACK, expected_seq_num);
 
 				memcpy(buf, incoming_packet->data, payload_len);
 				proper_read = TRUE;
@@ -399,7 +398,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			}
 			else{
 				/* Packet out of order. */
-				build_empty_packet(ACK_packet, DATAACK, (uint8_t)s.seq_num);
+				build_empty_packet(ACK_packet, DATAACK, s.seq_num);
 				// ACK_packet->seqnum = (uint8_t)s.seq_num;
 				printf("Packet is Out of Order. Sending old acknowledgement %d\n", ACK_packet->seqnum);
 			}
@@ -407,7 +406,8 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 		else{
 			/* Packet is corrupted, send old ack. */
 			// ACK_packet->seqnum = (uint8_t)s.seq_num;
-			build_empty_packet(ACK_packet, DATAACK, (uint8_t)s.seq_num);
+			gbnhdr *ACK_packet = alloc_pkt();
+			build_empty_packet(ACK_packet, DATAACK, s.seq_num);
 			printf("Packet is Corrupted. Sending old acknowledgement %d\n", ACK_packet->seqnum);
 		}
 
@@ -948,7 +948,7 @@ uint8_t validate(gbnhdr *packet){
 	uint16_t rcvd_checksum = packet->checksum;
 	packet->checksum = (uint16_t)0;
 
-	uint16_t pkt_checksum = checksum((uint16_t  *)packet, sizeof(*packet) / sizeof(uint8_t));
+	uint16_t pkt_checksum = checksum((uint16_t  *)packet, sizeof(*packet) / sizeof(uint16_t));
 	printf("rcvd checksum: %d. calculated checksum: %d\n", rcvd_checksum, pkt_checksum);
 	
 	if (rcvd_checksum == pkt_checksum){
@@ -982,7 +982,7 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 	data_packet->payload_len = len;
 
 	/* Add Checksum*/
-	uint16_t calc_checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint8_t));
+	uint16_t calc_checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
 
 	data_packet->checksum = calc_checksum;
 }
@@ -1005,7 +1005,7 @@ void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqn
 	data_packet->seqnum = pkt_seqnum;
 
 	/* Add Checksum*/
-	uint16_t calc_checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint8_t));
+	uint16_t calc_checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
 
 	data_packet->checksum = calc_checksum;
 }
