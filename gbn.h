@@ -20,11 +20,11 @@ extern int h_errno;
 extern int errno;
 
 /*----- Protocol parameters -----*/
-#define LOSS_PROB 1e-2    /* loss probability                            */
-#define CORR_PROB 1e-3    /* corruption probability                      */
+#define LOSS_PROB 5e-3    /* loss probability              1e-2              */
+#define CORR_PROB 0e-3    /* corruption probability        1e-3              */
 #define DATALEN   1024    /* length of the payload                       */
 #define N         1024    /* Max number of packets a single call to gbn_send can process */
-#define TIMEOUT      3    /* timeout to resend packets (1 second)        */
+#define TIMEOUT      1    /* timeout to resend packets (1 second)        */
 #define MAX_ATTEMPTS 5	  /* max attempts before assuming broken connection */
 
 /*----- Packet types -----*/
@@ -46,6 +46,7 @@ typedef struct {
 	uint8_t  type;            /* packet type (e.g. SYN, DATA, ACK, FIN)     */
 	uint8_t  seqnum;          /* sequence number of the packet              */
     uint16_t checksum;        /* header and payload checksum                */
+	// uint16_t payload_len;	  /* Length of payload 							*/
     uint8_t data[DATALEN];    /* pointer to the payload                     */
 } __attribute__((packed)) gbnhdr;
 

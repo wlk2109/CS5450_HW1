@@ -22,11 +22,14 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 
 	/* Get total number of packets*/
 	int num_packets = 1; /* Min Number of packets */
-	// s.remainder = len % DATALEN +1;
+	int remainder = len % DATALEN;
 
 	if (len > DATALEN){
-		num_packets = 1 + len / DATALEN;
+		num_packets = len / DATALEN;
 	}
+
+	// printf("Num Packets: %d, remainder %d\n",num_packets, remainder);
+	// return (-1);
 
 	//s.final_seq_number = s.seq_num + num_packets;
 
@@ -241,7 +244,7 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			/* corrupted Ack: Try again?*/
 			/* TODO: Handle this better. */
 
-			printf("Invalid/Corrupted DATAACK Packet, retrying receive\n");
+			printf("Invalid/Corrupted DATAACK Packet, reetrying receive\n");
 			// printf("Reducing window_size, resending packets\n");
 			// if (s.window_size >1){
 			// 	s.window_size = s.window_size/2;
@@ -297,10 +300,11 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 	//printf("This side is the receiver.\n");
 	s.sender = FALSE;
 	int first_packet = FALSE;
+	
 	ssize_t payload_len;
-
 	printf("Last acked packet seq_num: %d\n", s.seq_num);
 	/* track expected sequence number */
+	//uint8_t expected_seq_num = (uint8_t) s.seq_num + 1;
 	uint8_t expected_seq_num = (uint8_t) s.seq_num + 1;
 	printf("Expected packet seq_num: %d (should be %d)\n", expected_seq_num, (uint8_t)s.seq_num+1);
 	/* Allocate packet to receive? */
@@ -365,6 +369,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			/* validate SeqNum*/
 			if (incoming_packet->seqnum == expected_seq_num){
 				s.seq_num++;
+				// payload_len = incoming_packet->payload_len;
 				payload_len = len;
 				memcpy(buf, incoming_packet->data, payload_len);
 				printf("\nCopied %d bytes to buf and increased seq_num to %d\n\n", payload_len, s.seq_num);
