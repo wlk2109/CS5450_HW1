@@ -325,7 +325,14 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			* s.final_seq_number = s.seqnum;
 			* s.remainder = 0;
 			*/
-			return 0;
+			if (incoming_packet->type == FIN) {
+				s.current_state = FIN_RCVD;
+				return 0;
+			}
+
+			s.final_seq_number = s.seq_num;
+			s.remainder = 0;
+			s.message_complete = FALSE;
 		}
 
 
