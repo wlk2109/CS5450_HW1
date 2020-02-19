@@ -191,6 +191,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			}
 			/* Reset Attempts */
 			attempts = 0;
+			alarm(0);
+			timeout_count = 0;
 
 			printf("Received Packet. Type: %d, seq_num %d\n", DATAACK_packet->type, DATAACK_packet->seqnum);
 			printf("Target Packet: %d, Seq_num = %d\n\n", expected_ack, (uint8_t) expected_ack);
@@ -256,12 +258,14 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			/* TODO: Handle this better. */
 
 			printf("Invalid/Corrupted DATAACK Packet, reetrying receive\n");
-			// printf("Reducing window_size, resending packets\n");
-			// if (s.window_size >1){
-			// 	s.window_size = s.window_size/2;
-			// }
-			// timeout_count = 0;
-			// packets_out = 0;	
+			if(s.window_size<4){
+				printf("Reducing window_size, resending packets\n");
+				if (s.window_size >1){
+					s.window_size = s.window_size/2;
+					}
+				timeout_count = 0;
+				packets_out = 0;
+			}
 			break;
 			//continue;
 
@@ -318,7 +322,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 	
 	uint8_t expected_seq_num = (uint8_t) s.seq_num + 1;
 	
-	//printf("Expected packet seq_num: %d (should be %d)\n", expected_seq_num, (uint8_t)s.seq_num+1);
+	printf("Expected packet seq_num: %d (should be %d)\n", expected_seq_num, (uint8_t)s.seq_num+1);
 	/* Allocate packet to receive? */
 	
 	//printf("Allocating incoming packet\n");
@@ -364,7 +368,7 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 		//printf("Maybe Recv From Success\n");
 		
-		//printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
+		printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
 
 		if(validate(incoming_packet)==1){
 
@@ -385,25 +389,26 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 
 			/* validate SeqNum*/
 			if (incoming_packet->seqnum == expected_seq_num){
-				printf("Received packet: %d. Expected Packet: %d packet_type = %d\n", incoming_packet->seqnum, expected_seq_num, incoming_packet->type);
 				s.seq_num++;
 				payload_len = incoming_packet->payload_len;
 				//payload_len = len;
-				printf("payload len %d. Data Len %d\n",payload_len,sizeof(incoming_packet->data));
+
 				memcpy(buf, incoming_packet->data, payload_len);
 				proper_read = TRUE;
 				printf("\nCopied %d bytes to buf and increased seq_num to %d\n\n", payload_len, s.seq_num);
 			}
 			else{
 				/* Packet out of order. */
-				ACK_packet->seqnum = (uint8_t)s.seq_num;
-				//printf("Packet is Out of Order. Sending old acknowledgement %d\n", ACK_packet->seqnum);
+				build_empty_packet(ACK_packet, DATAACK, (uint8_t)s.seq_num);
+				// ACK_packet->seqnum = (uint8_t)s.seq_num;
+				printf("Packet is Out of Order. Sending old acknowledgement %d\n", ACK_packet->seqnum);
 			}
 		}
 		else{
 			/* Packet is corrupted, send old ack. */
-			ACK_packet->seqnum = (uint8_t)s.seq_num;
-			//printf("Packet is Corrupted. Sending old acknowledgement %d\n", ACK_packet->seqnum);
+			// ACK_packet->seqnum = (uint8_t)s.seq_num;
+			build_empty_packet(ACK_packet, DATAACK, (uint8_t)s.seq_num);
+			printf("Packet is Corrupted. Sending old acknowledgement %d\n", ACK_packet->seqnum);
 		}
 
 		//printf("MaybeSendTo Call, attempt %d\n", attempts);
@@ -424,9 +429,9 @@ ssize_t gbn_recv(int sockfd, void *buf, size_t len, int flags){
 			attempts = 0;
 			break;
 		}
+		printf("Send To Succeeded. ACK sent. Ack Packet: %d, Checksum: %d\n\n", ACK_packet->seqnum, ACK_packet->checksum);
 
 		if(proper_read){
-			//printf("Send To Succeeded. ACK sent. Ack Packet: %d\n", ACK_packet->seqnum);
 			/* free memory */
 			free(incoming_packet);
 			free(ACK_packet);
@@ -943,8 +948,8 @@ uint8_t validate(gbnhdr *packet){
 	uint16_t rcvd_checksum = packet->checksum;
 	packet->checksum = (uint16_t)0;
 
-	uint16_t pkt_checksum = checksum((uint16_t  *)packet, sizeof(*packet) / sizeof(uint16_t));
-	printf("rcvd checksum: %d. expected checksum: %d\n", rcvd_checksum, pkt_checksum);
+	uint16_t pkt_checksum = checksum((uint16_t  *)packet, sizeof(*packet) / sizeof(uint8_t));
+	printf("rcvd checksum: %d. calculated checksum: %d\n", rcvd_checksum, pkt_checksum);
 	
 	if (rcvd_checksum == pkt_checksum){
 		return(TRUE);
@@ -977,7 +982,9 @@ void build_data_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnu
 	data_packet->payload_len = len;
 
 	/* Add Checksum*/
-	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
+	uint16_t calc_checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint8_t));
+
+	data_packet->checksum = calc_checksum;
 }
 
 void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqnum){
@@ -990,7 +997,7 @@ void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqn
 
 	/* Zero out checksum */
 	data_packet->checksum = (uint16_t)0;
-
+	data_packet->payload_len = (uint16_t)0;
 	/* Set Packet type  */
 	data_packet->type = pkt_type;
 
@@ -998,7 +1005,9 @@ void build_empty_packet(gbnhdr *data_packet, uint8_t pkt_type ,uint32_t pkt_seqn
 	data_packet->seqnum = pkt_seqnum;
 
 	/* Add Checksum*/
-	data_packet->checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint16_t));
+	uint16_t calc_checksum = checksum((uint16_t  *)data_packet, sizeof(*data_packet) / sizeof(uint8_t));
+
+	data_packet->checksum = calc_checksum;
 }
 
 void timeout_hdler(int signum) {
