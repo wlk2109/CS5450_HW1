@@ -736,6 +736,7 @@ int gbn_socket(int domain, int type, int protocol){
 
     /* initialize signal handler	*/
 	signal(SIGALRM, timeout_hdler);
+	siginterrupt(SIGALRM,1);
 
     printf("Seq num: %d, Window size: %d\n", s.seq_num, s.window_size);
 
