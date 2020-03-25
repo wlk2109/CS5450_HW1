@@ -20,8 +20,8 @@ extern int h_errno;
 extern int errno;
 
 /*----- Protocol parameters -----*/
-#define LOSS_PROB 5e-3    /* loss probability              1e-2              */
-#define CORR_PROB 1e-3    /* corruption probability        1e-3              */
+#define LOSS_PROB 15e-2    /* loss probability              1e-2              */
+#define CORR_PROB 0	      /* corruption probability        1e-3              */
 #define DATALEN   1024    /* length of the payload                       */
 #define N         1024    /* Max number of packets a single call to gbn_send can process */
 #define TIMEOUT      1    /* timeout to resend packets (1 second)        */

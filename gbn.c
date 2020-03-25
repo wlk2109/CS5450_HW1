@@ -21,14 +21,16 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	/* Get total number of packets*/
 	int num_packets = 1; /* Min Number of packets */
 	int remainder = len % DATALEN;
+	int ack_count = 0;
 
 	if (len > DATALEN){
 		num_packets = len / DATALEN;
+		if (remainder >0) {
+			num_packets++;
+		}
+
 	}
 
-	if (remainder >0) {
-		num_packets++;
-	}
 
 	printf("Sending %d bytes of data. Total Packets = %d.\n", len, num_packets);
 
@@ -57,7 +59,6 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 	 * Number of elements is the number of packets TOTAL
 	 */
 	gbnhdr *outgoing_packets[num_packets];
-	printf("Total bytes in payload: %d\n",sizeof(*buf));
 
 		int i;
 		for (i = 0; i < num_packets; i++){
@@ -103,15 +104,18 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			}
 			
 			gbnhdr *out_pkt = outgoing_packets[packets_sent + packets_out];
-
-			if(maybe_sendto(sockfd, out_pkt, sizeof(*out_pkt), flags, &s.address, s.sock_len) == -1){
-				printf("Send to Failed, retrying\n");
-				/* Reset Timeout*/
-				attempts++;
-				continue;
+			int i;
+			for(i =0; i<2; i++){
+				if(maybe_sendto(sockfd, out_pkt, sizeof(*out_pkt), flags, &s.address, s.sock_len) == -1){
+					printf("Send to Failed, retrying\n");
+					/* Reset Timeout*/
+					attempts++;
+					continue;
+				}
 			}
 
-			printf("Successfully Sent Packet %d. Sequence Num: %d\n", packets_sent + packets_out, out_pkt->seqnum);
+			/*printf("Successfully Sent Packet %d. Sequence Num: %d\n", packets_sent + packets_out, out_pkt->seqnum);*/
+
 			attempts = 0;
 			packets_out++;
 
@@ -167,9 +171,10 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 			alarm(0);
 			timeout_count = 0;
 
-			printf("Received Packet. Type: %d, seq_num %d\n", DATAACK_packet->type, DATAACK_packet->seqnum);
-			printf("Target Packet: %d, Seq_num = %d\n\n", expected_ack, (uint8_t) expected_ack);
-			
+			/* printf("Received Packet. Type: %d, seq_num %d\n", DATAACK_packet->type, DATAACK_packet->seqnum);
+			 * printf("Target Packet: %d, Seq_num = %d\n\n", expected_ack, (uint8_t) expected_ack);
+			 */
+
 			/* Process Ack */
 			if ((validate(DATAACK_packet) == TRUE) && DATAACK_packet->type == DATAACK){
 			
@@ -177,8 +182,8 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 
 				if (recv_seqnum >= (uint8_t) expected_ack || recv_seqnum <= (uint8_t)expected_ack+MAX_WINDOW_SIZE){
 
-					printf("Seq Num Received: %d. Expected Ack %d\n\n",recv_seqnum,(uint8_t)expected_ack);
-					/* If Ack is good: 
+					/*  printf("Seq Num Received: %d. Expected Ack %d\n\n",recv_seqnum,(uint8_t)expected_ack);
+					* If Ack is good: 
 					*
 					* -Increment packets_sent
 					* -Increment expected seq_num
@@ -200,13 +205,13 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 					most_recent_ack = s.seq_num;
 					s.seq_num += packets_acked;
 					expected_ack = s.seq_num +1;
-					/* printf("Total Packets Acked: %d. New packets Out: %d\n", packets_acked, packets_out); */
+					printf("Total Packets Acked: %d. New packets Out: %d\n", packets_acked, packets_out);
 
 					if (s.seq_num >= target_ack){
-						printf("Received target ack %d\n", target_ack);
+						// printf("Received target ack %d\n", target_ack);
 						s.window_size = 2*s.window_size;
 						target_ack = most_recent_ack + s.window_size; 
-						printf("Increasing Window Size to%d\n",s.window_size);
+						// printf("Increasing Window Size to%d\n",s.window_size);
 					}
 
 					break;
@@ -220,6 +225,12 @@ ssize_t gbn_send(int sockfd, const void *buf, size_t len, int flags){
 				 */ 
 					alarm(0);
 					timeout_count = 0;
+					if (recv_seqnum == (uint8_t) expected_ack){
+						ack_count++;
+						if (ack_count<3){
+							break;
+						}
+					}
 					printf("Reducing window size\n");
 					if (s.window_size >1){
 						s.window_size = s.window_size/2;
